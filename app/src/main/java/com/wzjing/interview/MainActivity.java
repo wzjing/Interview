@@ -15,17 +15,21 @@ import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
+import android.util.Pair;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
 import android.widget.Chronometer;
 import android.widget.Toast;
 
+import com.wzjing.interview.audio.AudioManager;
 import com.wzjing.interview.camera.CameraManager;
 import com.wzjing.interview.encode.EncodeManager;
+import com.wzjing.interview.muxer.Muxer;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 
 public class MainActivity extends AppCompatActivity implements SurfaceHolder.Callback {
 
@@ -35,6 +39,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private Chronometer timeCounter;
 
     private CameraManager cameraManager;
+    private AudioManager audioManager;
     private boolean surfaceReady = false;
     private boolean cameraOpen = false;
     private final int CODE_PERMISSION_CAMERA = 0x101;
@@ -89,17 +94,32 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         fabButton.setOnClickListener(v -> {
             if (encodeManager == null) return;
             if (!encodeManager.isEncoding()) {
-                File file = getFile("Download/video.h264");
-                if (file == null) return;
-                encodeManager.startEncode(file);
+                File videoFile = getFile("Download/video.h264");
+                File audioFile = getFile("Download/audio.pcm");
+                if (videoFile == null || audioFile == null) return;
+                encodeManager.startEncode(videoFile);
+                audioManager.startRecord(audioFile);
             } else {
                 encodeManager.stopEncode();
+                audioManager.stopRecord();
             }
         });
 
         cameraManager = new CameraManager(surfaceView.getHolder(), width, height);
+        audioManager = new AudioManager(44100, 2);
         encodeManager = new EncodeManager(width, height);
 
+        audioManager.setRecordListener(new AudioManager.AudioRecordCallback() {
+            @Override
+            public void onError(String msg) {
+                showErrorDialog("Audio Record Error", msg);
+            }
+
+            @Override
+            public void onStart() {
+
+            }
+        });
         encodeManager.setEncodeListener(new EncodeManager.EncodeListener() {
             @Override
             public void onStart() {
@@ -144,6 +164,36 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 Toast.makeText(MainActivity.this, "Write finished", Toast.LENGTH_SHORT).show();
             }
         });
+
+        ArrayList<Pair<String, String>> sources = new ArrayList<>();
+        for (int i = 0; i < 10; i++) {
+            sources.add(new Pair<>("video" + i, "audio" + i));
+        }
+
+        Muxer muxer = new Muxer(sources, "dest.mp4");
+//        muxer.setMuxListener(new Muxer.MuxListener() {
+//
+//            @Override
+//            public void onStart() {
+//                Log.d(TAG, "onStart: ");
+//            }
+//
+//            @Override
+//            public void onProgress(int progress) {
+//                Log.d(TAG, "onProgress: ");
+//            }
+//
+//            @Override
+//            public void onError(String msg) {
+//                Log.d(TAG, "onError: ");
+//            }
+//
+//            @Override
+//            public void onFinish() {
+//                Log.d(TAG, "onFinish: ");
+//            }
+//        });
+        muxer.mux();
     }
 
     @Override
@@ -199,7 +249,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             showErrorDialog("Camera set display failed", e.getMessage());
         } catch (RuntimeException e) {
             e.printStackTrace();
-            showErrorDialog("Camera open error", e.getMessage());
+            showErrorDialog("Camera startRecord error", e.getMessage());
         }
         cameraOpen = true;
     }

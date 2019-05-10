@@ -8,14 +8,12 @@
 #include <cstdio>
 #include <android/log.h>
 
-#define TAG "native-log"
-
-#define LOGV(format, ...) __android_log_print(ANDROID_LOG_VERBOSE, TAG, format, ## __VA_ARGS__)
+#define LOGV(TAG, format, ...) __android_log_print(ANDROID_LOG_VERBOSE, TAG, format, ## __VA_ARGS__)
 #ifdef DEBUG
-#define LOGD(format, ...) __android_log_print(ANDROID_LOG_DEBUG, TAG, format, ## __VA_ARGS__)
+#define LOGD(TAG, format, ...) __android_log_print(ANDROID_LOG_DEBUG, TAG, format, ## __VA_ARGS__)
 #else
-#define LOGD(format, ...)
+#define LOGD(TAG, format, ...)
 #endif
-#define LOGE(format, ...) __android_log_print(ANDROID_LOG_ERROR, TAG, format, ## __VA_ARGS__)
+#define LOGE(TAG, format, ...) __android_log_print(ANDROID_LOG_ERROR, TAG, format, ## __VA_ARGS__)
 
 #endif //VIDEOBOX_LOG_H

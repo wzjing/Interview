@@ -1,0 +1,16 @@
+
+add_library(utils SHARED log.h io.h io.cpp)
+
+find_library(log-lib log)
+
+include_directories(${PROJECT_SOURCE_DIR})
+
+target_link_libraries(utils
+        ${log-lib}
+        avcodec
+        avformat
+        avfilter
+        avutil
+        swresample
+        swscale
+        x264)

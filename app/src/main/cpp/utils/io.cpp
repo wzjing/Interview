@@ -4,11 +4,12 @@
 
 #include "io.h"
 
+const char * TAG = "io-util";
 
 void read_yuv(FILE *file, AVFrame *frame, int width, int height, int index,
               enum AVPixelFormat pix_fmt) {
   if (!av_frame_is_writable(frame)) {
-    LOGE("read_yuv: AVFrame is not writable\n");
+    LOGE(TAG, "read_yuv: AVFrame is not writable\n");
     return;
   }
 
@@ -36,7 +37,7 @@ void read_yuv(FILE *file, AVFrame *frame, int width, int height, int index,
       fread(frame->data[0], 1, width * height * 3, file);
       return;
     default:
-      LOGE("unknown pixel format\n");
+      LOGE(TAG, "unknown pixel format\n");
       return;
   }
 }
@@ -44,7 +45,7 @@ void read_yuv(FILE *file, AVFrame *frame, int width, int height, int index,
 void read_pcm(FILE *file, AVFrame *frame, int nb_samples, int channels, int index,
               enum AVSampleFormat sample_fmt) {
   if (!av_frame_is_writable(frame)) {
-    LOGE("read_pcm: AVFrame is not writable\n");
+    LOGE(TAG, "read_pcm: AVFrame is not writable\n");
     return;
   }
 //  frame->nb_samples = nb_samples;
@@ -67,13 +68,13 @@ void read_pcm(FILE *file, AVFrame *frame, int nb_samples, int channels, int inde
           memcpy(frame->data[ch] + i * sample_size, buf + ch * sample_size, sample_size);
         }
       }
-      LOGD("got frame\n");
+      LOGD(TAG, "got frame\n");
       break;
     case AV_SAMPLE_FMT_U8:
-      LOGD("TBD..\n");
+      LOGD(TAG, "TBD..\n");
       break;
     default:
-      LOGE("unknown sample format\n");
+      LOGE(TAG, "unknown sample format\n");
       break;
   }
 }
@@ -92,10 +93,10 @@ void read_pcm_to_raw(FILE *file, uint8_t **data, int nb_samples, int channels, i
       }
       break;
     case AV_SAMPLE_FMT_U8:
-      LOGD("TBD..\n");
+      LOGD(TAG, "TBD..\n");
       break;
     default:
-      LOGE("unknown sample format\n");
+      LOGE(TAG, "unknown sample format\n");
       break;
   }
 }

@@ -32,7 +32,7 @@ public class CameraManager {
         Log.d(TAG, "open");
         camera = Camera.open(Camera.CameraInfo.CAMERA_FACING_BACK);
         if (camera == null) {
-            throw new DeviceNotSupportException("can't open camera");
+            throw new DeviceNotSupportException("can't startRecord camera");
         }
 
         Camera.Parameters params = camera.getParameters();

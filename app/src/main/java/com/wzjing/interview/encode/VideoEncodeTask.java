@@ -6,6 +6,7 @@ import android.media.MediaFormat;
 import android.os.Build;
 import android.util.Log;
 import android.util.Pair;
+import android.util.Range;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -13,6 +14,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import java.util.Locale;
 import java.util.concurrent.ArrayBlockingQueue;
 
 public class VideoEncodeTask implements Runnable {
@@ -22,6 +24,7 @@ public class VideoEncodeTask implements Runnable {
     private MediaFormat format;
     private int width;
     private int height;
+    private int bitrate = 7200000;
 
     // IO
     private final int MAX_CACHE_SIZE = 10;
@@ -39,35 +42,53 @@ public class VideoEncodeTask implements Runnable {
     @Override
     public void run() {
         // Init encoder
-        frameQueue = new ArrayBlockingQueue<>(MAX_CACHE_SIZE);
-        format = MediaFormat.createVideoFormat("video/avc", width, height);
-        format.setInteger(MediaFormat.KEY_WIDTH, width);
-        format.setInteger(MediaFormat.KEY_HEIGHT, height);
-        format.setInteger(MediaFormat.KEY_FRAME_RATE, 30);
-        format.setInteger(MediaFormat.KEY_BIT_RATE, 7200000);
-        format.setInteger(MediaFormat.KEY_BITRATE_MODE, MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR);
-        format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 12);
-        format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar);
         MediaCodec mediaCodec;
         try {
-            mediaCodec = MediaCodec.createEncoderByType("video/avc");
+            String codec = "video/avc";
+            mediaCodec = MediaCodec.createEncoderByType(codec);
+            frameQueue = new ArrayBlockingQueue<>(MAX_CACHE_SIZE);
+            format = MediaFormat.createVideoFormat(codec, width, height);
+            format.setInteger(MediaFormat.KEY_WIDTH, width);
+            format.setInteger(MediaFormat.KEY_HEIGHT, height);
+            format.setInteger(MediaFormat.KEY_FRAME_RATE, 30);
+            if (Build.VERSION.SDK_INT >= 19) {
+                MediaCodecInfo codecInfo = mediaCodec.getCodecInfo();
+                Log.d(TAG, getCodecInfo(mediaCodec, codec, width, height));
+
+                if (Build.VERSION.SDK_INT >= 21) {
+                    MediaCodecInfo.EncoderCapabilities encoderCap = codecInfo.getCapabilitiesForType(codec).getEncoderCapabilities();
+                    if (encoderCap != null) {
+                        if (encoderCap.isBitrateModeSupported(MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR)) {
+                            format.setInteger(MediaFormat.KEY_BIT_RATE, bitrate);
+                            format.setInteger(MediaFormat.KEY_BITRATE_MODE, MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR);
+                        } else if (encoderCap.isBitrateModeSupported(MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CQ)) {
+                            format.setInteger(MediaFormat.KEY_BITRATE_MODE, MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CQ);
+                        } else {
+                            format.setInteger(MediaFormat.KEY_BIT_RATE, bitrate);
+                        }
+                    }
+                } else {
+                    format.setInteger(MediaFormat.KEY_BIT_RATE, bitrate);
+                }
+
+            } else {
+                format.setInteger(MediaFormat.KEY_BIT_RATE, bitrate);
+            }
+            format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 12);
+            format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar);
+            mediaCodec.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
         } catch (IOException e) {
             Log.e(TAG, "unable to create MediaCodec");
-            e.printStackTrace();
-            manager.notifyEvent(EncodeManager.MSG_ERROR, "unable to create MediaCodec");
+            e.printStackTrace(System.err);
+            manager.notifyEvent(EncodeManager.MSG_ERROR, e.getMessage());
+            return;
+        } catch (Exception e) {
+            e.printStackTrace(System.err);
+            manager.notifyEvent(EncodeManager.MSG_ERROR, e.getMessage());
             return;
         }
 
-        if (Build.VERSION.SDK_INT > 21) {
-            for (String type : mediaCodec.getCodecInfo().getSupportedTypes()) {
-                Log.d(TAG, "Type: " + type);
-            }
-            for (int pix : mediaCodec.getCodecInfo().getCapabilitiesForType("video/avc").colorFormats) {
-                Log.d(TAG, "Pixel: " + Integer.toHexString(pix));
-            }
-        }
 
-        mediaCodec.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
         mediaCodec.start();
 
         OutputStream oStream;
@@ -99,9 +120,10 @@ public class VideoEncodeTask implements Runnable {
                         inBuf.clear();
                         inputEof = inputBuffer.second;
                         inBuf.put(inputBuffer.first, 0, inputBuffer.first.length);
-                        mediaCodec.queueInputBuffer(inIdx, 0, inputBuffer.first.length, timestamp++,
+                        mediaCodec.queueInputBuffer(inIdx, 0, inputBuffer.first.length, timestamp,
                                 inputEof ? MediaCodec.BUFFER_FLAG_END_OF_STREAM : 0);
                         inputBuffer = null;
+                        timestamp += timestep;
                         encodeCount++;
                         Log.d(TAG, String.format("run: input --- %d\t%s", encodeCount, inputEof ? "EOF" : "->"));
                     }
@@ -146,12 +168,12 @@ public class VideoEncodeTask implements Runnable {
         // flush
         mediaCodec.flush();
 
-        // close
+        // stopRecord
         try {
             oStream.close();
         } catch (IOException e) {
             e.printStackTrace();
-            manager.notifyEvent(EncodeManager.MSG_ERROR, "Error while close file");
+            manager.notifyEvent(EncodeManager.MSG_ERROR, "Error while stopRecord file");
         }
         try {
             mediaCodec.stop();
@@ -171,5 +193,53 @@ public class VideoEncodeTask implements Runnable {
         frameQueue.add(new Pair<>(data, eof));
     }
 
+    public String getCodecInfo(MediaCodec codec, String codecType, int width, int height) {
+        if (Build.VERSION.SDK_INT < 19) return "MediaCodec information unavailable";
+        MediaCodecInfo codecInfo = codec.getCodecInfo();
+        StringBuilder sb = new StringBuilder();
+        sb.append("MediaCodec Info:\n");
+        sb.append("Support Types:\n");
+        for (String type : codecInfo.getSupportedTypes()) {
+            sb.append(String.format(Locale.getDefault(), "\t%s\n", type));
+        }
+
+        sb.append("Support Pixel Format:\n");
+        for (int pix : codecInfo.getCapabilitiesForType(codecType).colorFormats) {
+            sb.append(String.format(Locale.getDefault(), "\t%s\n", pix > 43 ? "0x" + Integer.toHexString(pix) : pix + ""));
+        }
+        if (Build.VERSION.SDK_INT >= 23) {
+            MediaCodecInfo.VideoCapabilities videoCap = codecInfo.getCapabilitiesForType(codecType).getVideoCapabilities();
+            if (videoCap != null) {
+                sb.append("Video Support:\n");
+                Range<Double> fpsRange = null;
+                try {
+                    fpsRange = videoCap.getAchievableFrameRatesFor(width, height);
+                } catch (Exception e) {
+//                    e.printStackTrace(System.err);
+                    Log.d(TAG, "getCodecInfo: bitrate info not support for current size");
+                }
+                if (fpsRange != null) {
+                    sb.append(String.format(Locale.getDefault(), "\tFPS Range:\t%f ~ %f\n", fpsRange.getLower(), fpsRange.getUpper()));
+                }
+                Range<Integer> brRange = videoCap.getBitrateRange();
+                if (brRange != null) {
+                    sb.append(String.format(Locale.getDefault(), "\tBitrate Range:\t%d ~ %d\n", brRange.getLower(), brRange.getUpper()));
+                }
+            }
+            MediaCodecInfo.AudioCapabilities audioCap = codecInfo.getCapabilitiesForType(codecType).getAudioCapabilities();
+            if (audioCap != null) {
+                sb.append("Audio Support:\n");
+                for (int sampleRate : audioCap.getSupportedSampleRates()) {
+                    sb.append(String.format(Locale.getDefault(), "\t%d\n", sampleRate));
+                }
+                Range<Integer> audioBitRateRange = audioCap.getBitrateRange();
+                if (audioBitRateRange != null) {
+                    sb.append(String.format(Locale.getDefault(), "\tSample Range: \t%d ! %d\n", audioBitRateRange.getLower(), audioBitRateRange.getUpper()));
+                }
+            }
+        }
+
+        return sb.toString();
+    }
 
 }

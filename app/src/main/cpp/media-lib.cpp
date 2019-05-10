@@ -10,7 +10,7 @@ extern "C" {
 
 float getSeconds() {
     auto now = std::chrono::high_resolution_clock::now();
-    long nanoSec = now.time_since_epoch().count() / 1000000;
+    long nanoSec = (long) (now.time_since_epoch().count() / 1000000);
     float sec = nanoSec / 1000.0f;
     return sec;
 }

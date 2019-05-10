@@ -33,7 +33,7 @@ public class VideoTransformTask implements Runnable {
         Looper.prepare();
         looper = Looper.myLooper();
         mHandler = new VideoTransformHandler(looper, this);
-        videoEncodeTask = new VideoEncodeTask(manager, width, height, destFile);
+        videoEncodeTask = new VideoEncodeTask(manager, height, width, destFile);
         manager.execute(videoEncodeTask);
         Looper.loop();
     }
@@ -68,7 +68,7 @@ public class VideoTransformTask implements Runnable {
                 if (task == null) return;
                 long start = System.currentTimeMillis();
                 boolean eof = msg.arg1 == 1;
-                task.videoEncodeTask.addFrame(nv21ToNV12((byte[]) msg.obj, task.width, task.height), eof);
+                task.videoEncodeTask.addFrame(nv21ToNV12WithRotate((byte[]) msg.obj, task.width, task.height), eof);
                 if (eof) {
                     task.cancel();
                 }
@@ -98,9 +98,36 @@ public class VideoTransformTask implements Runnable {
             if (tempBuffer == null) tempBuffer = new byte[width * height * 3 / 2];
             int size = width * height;
             System.arraycopy(buffer, 0, tempBuffer, 0, size);
-            for (int i = 0; i < size / 2-1; i += 2) {
+            for (int i = 0; i < size / 2 - 1; i += 2) {
                 tempBuffer[size + i] = buffer[size + i + 1];
                 tempBuffer[size + i + 1] = buffer[size + i];
+            }
+            Log.d(TAG, "nv21ToYUV420p: " + (System.currentTimeMillis() - start) + "ms");
+            return tempBuffer;
+        }
+
+        private byte[] nv21ToNV12WithRotate(byte[] buffer, int width, int height) {
+            long start = System.currentTimeMillis();
+            if (buffer == null) return null;
+            if (tempBuffer == null) tempBuffer = new byte[width * height * 3 / 2];
+            int size = width * height;
+            int i;
+            int j;
+            for (i = 0; i < width; ++i) {
+                for (j = 0; j < height; ++j) {
+                    tempBuffer[i * height + j] = buffer[(height - j - 1) * width + i];
+                }
+            }
+
+            for (i = 0; i < width / 2; ++i) {
+                for (j = 0; j < height; j += 2) {
+//                    System.out.println("Index: " + (i * height + j));
+                    // tempBuffer[size + i * height + j] = "V" + (size + i * height + j);
+                    // tempBuffer[size + i * height + 1 + j] = "U" + (size + i * height + 1 + j);
+
+                    tempBuffer[size + i * height + j] = buffer[size + (height / 2 - j / 2 - 1) * width + i * 2 + 1];
+                    tempBuffer[size + i * height + 1 + j] = buffer[size + (height / 2 - j / 2 - 1) * width + i * 2];
+                }
             }
             Log.d(TAG, "nv21ToYUV420p: " + (System.currentTimeMillis() - start) + "ms");
             return tempBuffer;

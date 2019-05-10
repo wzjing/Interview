@@ -35,11 +35,11 @@ android {
         sourceCompatibility = 1.8
         targetCompatibility = 1.8
     }
-//    sourceSets {
-//        main {
-//            jniLibs.srcDirs 'src/main/cpp/thirdpart/lib'
-//        }
-//    }
+    sourceSets {
+        main {
+            jniLibs.srcDirs 'src/main/cpp/thirdpart/lib'
+        }
+    }
 }
 
 dependencies {
