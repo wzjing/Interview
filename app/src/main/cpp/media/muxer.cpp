@@ -54,5 +54,9 @@ extern "C"
 JNIEXPORT void JNICALL
 Java_com_wzjing_interview_muxer_Muxer_nativeSetListener(JNIEnv *env, jobject thiz,
                                                         jobject listener) {
-    mux_listener = new MuxLixtener(env, &listener);
+    if (listener != nullptr) {
+        mux_listener = new MuxLixtener(env, &listener);
+    } else {
+        mux_listener = nullptr;
+    }
 }

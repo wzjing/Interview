@@ -70,6 +70,16 @@ public class AudioManager {
             return;
         }
 
+        if (audioRecord.getState() == AudioRecord.STATE_UNINITIALIZED) {
+            Log.w(TAG, "initial audio record fail");
+            try {
+                oStream.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            return;
+        }
+
         audioRecord.startRecording();
         byte[] buffer = new byte[bufferSize];
         while (recording || audioRecord.getState() == AudioRecord.RECORDSTATE_RECORDING) {

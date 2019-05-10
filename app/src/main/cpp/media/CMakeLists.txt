@@ -12,6 +12,7 @@ target_link_libraries(media
         avformat
         avfilter
         avutil
+        postproc
         swresample
         swscale
         x264)

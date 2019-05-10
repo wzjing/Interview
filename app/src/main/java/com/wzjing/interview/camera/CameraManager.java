@@ -43,13 +43,13 @@ public class CameraManager {
                 break;
             }
         }
+        for (int[] fpsRange : params.getSupportedPreviewFpsRange()) {
+            Log.d(TAG, "Range: " + fpsRange[0] + ":" + fpsRange[1]);
+        }
         if (fpsSupported) {
-            for (int[] fpsRange : params.getSupportedPreviewFpsRange()) {
-                Log.d(TAG, "Range: " + fpsRange[0] + ":" + fpsRange[1]);
-            }
             params.setPreviewFpsRange(30000, 30000);
         } else {
-            throw new DeviceNotSupportException("device not support 30fps video recording");
+//            throw new DeviceNotSupportException("device not support 30fps video recording");
         }
         boolean sizeSupported = false;
         for (Camera.Size size : params.getSupportedPreviewSizes()) {

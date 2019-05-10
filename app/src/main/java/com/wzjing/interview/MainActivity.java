@@ -170,7 +170,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             sources.add(new Pair<>("video" + i, "audio" + i));
         }
 
-        Muxer muxer = new Muxer(sources, "dest.mp4");
+//        Muxer muxer = new Muxer(sources, "dest.mp4");
 //        muxer.setMuxListener(new Muxer.MuxListener() {
 //
 //            @Override
@@ -193,7 +193,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 //                Log.d(TAG, "onFinish: ");
 //            }
 //        });
-        muxer.mux();
+//        muxer.mux();
     }
 
     @Override

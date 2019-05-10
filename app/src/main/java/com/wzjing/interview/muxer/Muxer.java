@@ -10,13 +10,14 @@ public class Muxer {
     static {
         System.loadLibrary("media");
         System.loadLibrary("utils");
-        System.loadLibrary("avutil");
-        System.loadLibrary("avcodec");
-        System.loadLibrary("avformat");
-        System.loadLibrary("avfilter");
-        System.loadLibrary("swscale");
-        System.loadLibrary("swresample");
-        System.loadLibrary("x264");
+//        System.loadLibrary("x264");
+//        System.loadLibrary("avutil");
+//        System.loadLibrary("swresample");
+//        System.loadLibrary("avcodec");
+//        System.loadLibrary("avformat");
+//        System.loadLibrary("postproc");
+//        System.loadLibrary("swscale");
+//        System.loadLibrary("avfilter");
     }
 
     private List<Pair<String, String>> sourceList;
@@ -51,6 +52,7 @@ public class Muxer {
 
     public void setMuxListener(MuxListener listener) {
         mListener = listener;
+        nativeSetListener(listener);
     }
 
     public static abstract class MuxListener {
