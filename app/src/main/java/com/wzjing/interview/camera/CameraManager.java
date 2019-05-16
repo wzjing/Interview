@@ -79,12 +79,22 @@ public class CameraManager {
         }
     }
 
+    public void unlock() {
+        if (camera != null) {
+            camera.unlock();
+        }
+    }
+
     public int getWidth() {
         return width;
     }
 
     public int getHeight() {
         return height;
+    }
+
+    public Camera getCamera() {
+        return camera;
     }
 
     public static class DeviceNotSupportException extends Exception {
