@@ -13,6 +13,7 @@ import_library(avfilter SHARED libavfilter.so)
 import_library(avutil SHARED libavutil.so)
 import_library(swresample SHARED libswresample.so)
 import_library(swscale SHARED libswscale.so)
+import_library(postproc SHARED libpostproc.so)
 import_library(x264 SHARED libx264.so)
 
 include_directories("${CMAKE_SOURCE_DIR}/thirdpart/include")

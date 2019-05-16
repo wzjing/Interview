@@ -13,4 +13,5 @@ target_link_libraries(utils
         avutil
         swresample
         swscale
+        postproc
         x264)
