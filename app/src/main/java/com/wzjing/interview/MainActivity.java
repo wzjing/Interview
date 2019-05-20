@@ -16,13 +16,12 @@ import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
-import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
 import android.widget.Chronometer;
 
-import com.wzjing.interview.camera.CameraManager;
+import com.wzjing.interview.record.CameraManager;
 
 import java.io.File;
 import java.io.IOException;

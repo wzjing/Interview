@@ -23,7 +23,7 @@ import android.widget.Chronometer;
 import android.widget.Toast;
 
 import com.wzjing.interview.audio.AudioManager;
-import com.wzjing.interview.camera.CameraManager;
+import com.wzjing.interview.record.CameraManager;
 import com.wzjing.interview.encode.EncodeManager;
 import com.wzjing.interview.muxer.Muxer;
 
