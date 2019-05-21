@@ -1,5 +1,5 @@
 
-add_library(media SHARED muxer.h muxer.cpp mux_listener.h mux_listener.cpp)
+add_library(media SHARED muxer.h muxer.cpp mux_listener.h mux_listener.cpp filter.h filter.cpp)
 
 find_library(log-lib log)
 

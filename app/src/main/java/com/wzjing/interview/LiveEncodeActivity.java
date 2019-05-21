@@ -125,16 +125,16 @@ public class LiveEncodeActivity extends AppCompatActivity implements SurfaceHold
             public void onStart() {
                 Log.d(TAG, "onStart: listener start");
                 isEof = false;
-                cameraManager.addCallback(((data, camera) -> {
-                    if (encodeManager.isEncoding()) {
-                        encodeManager.addFrame(data, false);
-                    } else if (isEof) {
-                        Log.d(TAG, "onPreview: eof frame");
-                        isEof = false;
-                        encodeManager.addFrame(data, true);
-                        cameraManager.addCallback(null);
-                    }
-                }));
+//                cameraManager.addCallback(((data, camera) -> {
+//                    if (encodeManager.isEncoding()) {
+//                        encodeManager.addFrame(data, false);
+//                    } else if (isEof) {
+//                        Log.d(TAG, "onPreview: eof frame");
+//                        isEof = false;
+//                        encodeManager.addFrame(data, true);
+//                        cameraManager.addCallback(null);
+//                    }
+//                }));
                 timeCounter.setTextColor(ContextCompat.getColor(LiveEncodeActivity.this, R.color.colorAccent));
                 timeCounter.setBase(SystemClock.elapsedRealtime());
                 timeCounter.start();
@@ -239,18 +239,7 @@ public class LiveEncodeActivity extends AppCompatActivity implements SurfaceHold
         }
 
         if (!surfaceReady || cameraOpen) return;
-        try {
-            cameraManager.open();
-        } catch (CameraManager.DeviceNotSupportException e) {
-            e.printStackTrace();
-            showErrorDialog("Device Not Support", e.getMessage());
-        } catch (IOException e) {
-            e.printStackTrace();
-            showErrorDialog("Camera set display failed", e.getMessage());
-        } catch (RuntimeException e) {
-            e.printStackTrace();
-            showErrorDialog("Camera startRecord error", e.getMessage());
-        }
+        cameraManager.open();
         cameraOpen = true;
     }
 

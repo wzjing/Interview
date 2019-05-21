@@ -15,7 +15,7 @@ android {
                 abiFilters 'armeabi-v7a', 'x86'
             }
         }
-        vectorDrawables{
+        vectorDrawables {
             useSupportLibrary = true
         }
     }

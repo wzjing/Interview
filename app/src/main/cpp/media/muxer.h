@@ -17,4 +17,8 @@ extern "C"
 JNIEXPORT void JNICALL
 Java_com_wzjing_interview_muxer_Muxer_nativeSetListener(JNIEnv *env, jobject thiz,
                                                         jobject listener);
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_wzjing_interview_MainActivity_filterFrame(JNIEnv *env, jobject thiz, jstring path);
+
 #endif //INTERVIEW_MUXER_H
