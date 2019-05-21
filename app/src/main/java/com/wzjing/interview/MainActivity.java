@@ -23,6 +23,18 @@ import java.io.IOException;
 
 public class MainActivity extends AppCompatActivity {
 
+    static {
+        System.loadLibrary("avcodec");
+        System.loadLibrary("avutil");
+        System.loadLibrary("avformat");
+        System.loadLibrary("avfilter");
+        System.loadLibrary("swresample");
+        System.loadLibrary("swscale");
+        System.loadLibrary("postproc");
+        System.loadLibrary("media");
+        System.loadLibrary("utils");
+    }
+
     private final String TAG = MainActivity.class.getSimpleName();
 
     private AlertDialog errorDialog;
@@ -34,6 +46,8 @@ public class MainActivity extends AppCompatActivity {
 
         FloatingActionButton fabButton = findViewById(R.id.actionFab);
         ImageView imageView = findViewById(R.id.imageView);
+
+        filterFrame(Environment.getExternalStorageDirectory().getPath() + File.separator + "frame.yuv");
     }
 
 

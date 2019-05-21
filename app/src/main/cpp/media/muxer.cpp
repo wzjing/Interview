@@ -7,8 +7,11 @@
 #include <cstdio>
 #include <cstring>
 #include <utils/log.h>
-#include <libavutil/frame.h>
 #include "filter.h"
+
+extern "C" {
+#include <libavutil/frame.h>
+}
 const char *TAG = "native-muxer";
 
 MuxLixtener *mux_listener;
@@ -62,16 +65,37 @@ Java_com_wzjing_interview_muxer_Muxer_nativeSetListener(JNIEnv *env, jobject thi
     }
 }
 
+int save_yuv(uint8_t **buf, const int *wrap, int width, int height, const char *filename) {
+    FILE *f;
+    f = fopen(filename, "wb");
+
+    for (int i = 0; i < height; i++) {
+        fwrite(buf[0] + wrap[0] * i, 1, width, f);
+    }
+
+    for (int i = 0; i < height / 2; i++) {
+        fwrite(buf[1] + wrap[1] * i, 1, width / 2, f);
+    }
+
+    for (int i = 0; i < height / 2; i++) {
+        fwrite(buf[2] + wrap[2] * i, 1, width / 2, f);
+    }
+    fflush(f);
+    fclose(f);
+    LOGD(TAG, "savefile: %s\n", filename);
+    return 0;
+}
+
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_wzjing_interview_MainActivity_filterFrame(JNIEnv *env, jobject thiz, jstring path) {
 
-    const char * path_ = env->GetStringUTFChars(path, JNI_FALSE);
+    const char *path_ = env->GetStringUTFChars(path, JNI_FALSE);
 
     int width = 1920;
-    int height =1080;
-    FILE* file = fopen(path_, "rb");
-    AVFrame* frame = av_frame_alloc();
+    int height = 1080;
+    FILE *file = fopen(path_, "rb");
+    AVFrame *frame = av_frame_alloc();
     frame->width = 1920;
     frame->height = 1080;
     frame->format = AV_PIX_FMT_YUV420P;
@@ -87,15 +111,36 @@ Java_com_wzjing_interview_MainActivity_filterFrame(JNIEnv *env, jobject thiz, js
     fread(frame->data[2], 1, width * height / 4, file);
 
     Filter filter;
-    filter.init("gblur=sigma=20:steps=6[blur];format=pix_fmts=argb24");
+    filter.init("gblur=sigma=20:steps=6[blur];[blur]format=pix_fmts=rgba",AV_PIX_FMT_YUV420P, AV_PIX_FMT_RGBA);
+    filter.dumpGraph();
     filter.filter(frame);
 
-    jclass VideoEditor = env->FindClass("com.wzjing.interview.VideoEditor");
+    LOGD(TAG, "call java\n");
+    jclass VideoEditor = env->FindClass("com/wzjing/interview/VideoEditor");
     jmethodID drawText = env->GetStaticMethodID(VideoEditor, "drawText",
                                                 "([IIILjava/lang/String;)V");
-    env->CallStaticVoidMethod(VideoEditor, drawText, frame->data, width, height, env->NewStringUTF("title"));
 
+    size_t arrSize = frame->linesize[0]*frame->height;
+    jintArray pixels = env->NewIntArray(arrSize);
 
+    auto *pPixels = (jint*) calloc(arrSize, sizeof(jint));
+    for (int i = 0; i < arrSize; i++) {
+        *(pPixels + i) = frame->data[0][i];
+    }
+
+    env->SetIntArrayRegion(pixels, 0, arrSize, pPixels);
+    env->CallStaticVoidMethod(VideoEditor, drawText, pixels, width, height,
+                              env->NewStringUTF("title"));
+    LOGD(TAG, "call java finished\n");
+
+    filter.init("format=pix_fmts=yuv420p",AV_PIX_FMT_RGBA, AV_PIX_FMT_YUV420P);
+    filter.dumpGraph();
+    filter.filter(frame);
+
+    char new_path[129];
+    snprintf(new_path, 128, "%s_filter.yuv", path_);
+
+    save_yuv(frame->data, frame->linesize, frame->width, frame->height, new_path);
 
     env->ReleaseStringUTFChars(path, path_);
 }

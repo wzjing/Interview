@@ -1,10 +1,9 @@
-#include <libavutil/pixdesc.h>
 #include "filter.h"
 
 #include "utils/log.h"
 
 
-int Filter::init(const char *filter_descr) {
+int Filter::init(const char *filter_descr,AVPixelFormat in_fmt,  AVPixelFormat out_fmt) {
     this->description = filter_descr;
     char args[512];
     int ret = 0;
@@ -13,7 +12,7 @@ int Filter::init(const char *filter_descr) {
     AVFilterInOut *outputs = avfilter_inout_alloc();
     AVFilterInOut *inputs = avfilter_inout_alloc();
     AVRational time_base = {1, 1};
-    enum AVPixelFormat pix_fmts[] = {AV_PIX_FMT_YUV420P, AV_PIX_FMT_NONE};
+    enum AVPixelFormat pix_fmts[] = {out_fmt, AV_PIX_FMT_NONE};
 
     filter_graph = avfilter_graph_alloc();
     if (!outputs || !inputs || !filter_graph) {
@@ -24,7 +23,7 @@ int Filter::init(const char *filter_descr) {
     /* buffer video source: the decoded frames from the decoder will be inserted here. */
     snprintf(args, sizeof(args),
              "video_size=%dx%d:pix_fmt=%d:time_base=%d/%d:pixel_aspect=%d/%d",
-             1920, 1080, AV_PIX_FMT_YUV420P,
+             1920, 1080, in_fmt,
              time_base.num, time_base.den,
              16, 9);
 
@@ -110,15 +109,18 @@ void Filter::filter(AVFrame *frame) {
     int ret = av_buffersrc_add_frame(getInputCtx(), frame);
     if (ret < 0) {
         av_frame_unref(frame);
-        LOGE(TAG, "add input error: %s\n", av_err2str(ret));
+        LOGE(TAG, "filter() input error: %s\n", av_err2str(ret));
         return;
     }
     av_frame_unref(frame);
     ret = av_buffersink_get_frame(getOutputCtx(), frame);
     if (ret == 0) {
-        LOGD(TAG, "Frame format: %s\n", av_get_pix_fmt_name((AVPixelFormat) frame->format));
+        LOGD(TAG, "filter() done: %s\n", description);
         for (int j = 0; frame->linesize[j]; ++j) {
             LOGD(TAG, "Frame buffer %d: %d\n", j, frame->linesize[j]);
         }
+        LOGD(TAG, "Format: %s\n", av_get_pix_fmt_name((AVPixelFormat)frame->format));
+    } else {
+        LOGE(TAG, "filter() error: %s\n", av_err2str(ret));
     }
 }

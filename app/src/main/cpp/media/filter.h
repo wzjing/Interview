@@ -13,11 +13,12 @@ extern "C" {
 #include <libavfilter/buffersink.h>
 #include <libavutil/channel_layout.h>
 #include <libavutil/opt.h>
+#include <libavutil/pixdesc.h>
 }
 
 class Filter {
 private:
-    const char* TAG = "Filter";
+    const char *TAG = "Filter";
 protected:
     AVFilterContext *buffersink_ctx;
     AVFilterContext *buffersrc_ctx;
@@ -27,7 +28,7 @@ public:
 
     Filter() = default;
 
-    int init(const char *filter_descr);
+    int init(const char *filter_descr, AVPixelFormat in_fmt, AVPixelFormat out_fmt);
 
     AVFilterContext *getInputCtx();
 
@@ -35,8 +36,9 @@ public:
 
     void dumpGraph();
 
-    void filter(AVFrame* src, AVFrame* dest);
-    void filter(AVFrame* frame);
+    void filter(AVFrame *src, AVFrame *dest);
+
+    void filter(AVFrame *frame);
 };
 
 
