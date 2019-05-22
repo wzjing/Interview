@@ -8,6 +8,7 @@
 #include <cstring>
 #include <utils/log.h>
 #include "filter.h"
+#include <utils/bitmap_utils.h>
 
 extern "C" {
 #include <libavutil/frame.h>
@@ -115,32 +116,63 @@ Java_com_wzjing_interview_MainActivity_filterFrame(JNIEnv *env, jobject thiz, js
     filter.dumpGraph();
     filter.filter(frame);
 
-    LOGD(TAG, "call java\n");
-    jclass VideoEditor = env->FindClass("com/wzjing/interview/VideoEditor");
-    jmethodID drawText = env->GetStaticMethodID(VideoEditor, "drawText",
-                                                "([IIILjava/lang/String;)V");
-
-    size_t arrSize = frame->linesize[0]*frame->height;
-    jintArray pixels = env->NewIntArray(arrSize);
-
-    auto *pPixels = (jint*) calloc(arrSize, sizeof(jint));
-    for (int i = 0; i < arrSize; i++) {
-        *(pPixels + i) = frame->data[0][i];
-    }
-
-    env->SetIntArrayRegion(pixels, 0, arrSize, pPixels);
-    env->CallStaticVoidMethod(VideoEditor, drawText, pixels, width, height,
-                              env->NewStringUTF("title"));
-    LOGD(TAG, "call java finished\n");
+    drawText(env, frame->data[0], frame->width, frame->height, "title", 30);
 
     filter.init("format=pix_fmts=yuv420p",AV_PIX_FMT_RGBA, AV_PIX_FMT_YUV420P);
     filter.dumpGraph();
     filter.filter(frame);
 
-    char new_path[129];
+    char new_path[128];
     snprintf(new_path, 128, "%s_filter.yuv", path_);
 
     save_yuv(frame->data, frame->linesize, frame->width, frame->height, new_path);
+
+    av_frame_free(&frame);
+
+    env->ReleaseStringUTFChars(path, path_);
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_wzjing_interview_MainActivity_fillBitmap(JNIEnv *env, jobject thiz, jobject bitmap, jstring path) {
+    const char *path_ = env->GetStringUTFChars(path, JNI_FALSE);
+
+    int width = 1920;
+    int height = 1080;
+    FILE *file = fopen(path_, "rb");
+    AVFrame *frame = av_frame_alloc();
+    frame->width = 1920;
+    frame->height = 1080;
+    frame->format = AV_PIX_FMT_YUV420P;
+
+    frame->linesize[0] = width;
+    frame->linesize[1] = width / 2;
+    frame->linesize[2] = width / 2;
+    frame->data[0] = (uint8_t *) (malloc(sizeof(uint8_t) * width * height));
+    frame->data[1] = (uint8_t *) (malloc(sizeof(uint8_t) * width * height / 4));
+    frame->data[2] = (uint8_t *) (malloc(sizeof(uint8_t) * width * height / 4));
+    fread(frame->data[0], 1, width * height, file);
+    fread(frame->data[1], 1, width * height / 4, file);
+    fread(frame->data[2], 1, width * height / 4, file);
+
+    Filter filter;
+    filter.init("gblur=sigma=20:steps=6[blur];[blur]format=pix_fmts=rgba",AV_PIX_FMT_YUV420P, AV_PIX_FMT_RGBA);
+    filter.dumpGraph();
+    filter.filter(frame);
+
+    AndroidBitmapInfo bitmap_info = {0};
+    uint8_t *pixels = nullptr;
+    size_t size = 0;
+
+
+    LOGD(TAG, "native filled bitmap");
+    AndroidBitmapInfo info = {0};
+    AndroidBitmap_getInfo(env, bitmap, &info);
+    size = info.stride * height;
+    LOGD(TAG, "Strip: %d\n", info.stride);
+    AndroidBitmap_lockPixels(env, bitmap, (void **) &pixels);
+    memcpy(pixels, frame->data[0], size);
+    AndroidBitmap_unlockPixels(env, bitmap);
 
     env->ReleaseStringUTFChars(path, path_);
 }

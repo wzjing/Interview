@@ -1,17 +1,11 @@
 
-add_library(utils SHARED log.h io.h io.cpp)
+add_library(utils SHARED log.h error.h bitmap_utils.h bitmap_utils.cpp)
 
 find_library(log-lib log)
 
-include_directories(${PROJECT_SOURCE_DIR})
+#include_directories(${PROJECT_SOURCE_DIR})
 
 target_link_libraries(utils
         ${log-lib}
-        avcodec
-        avformat
-        avfilter
-        avutil
-        swresample
-        swscale
-        postproc
-        x264)
+        jnigraphics
+        android)

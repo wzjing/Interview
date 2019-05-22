@@ -6,7 +6,7 @@ find_library(log-lib log)
 include_directories(${PROJECT_SOURCE_DIR})
 
 target_link_libraries(media
-        ${utils}
+        utils
         ${log-lib}
         avcodec
         avformat

@@ -19,5 +19,4 @@ import_library(x264 SHARED libx264.so)
 include_directories("${CMAKE_SOURCE_DIR}/thirdpart/include")
 
 add_subdirectory(utils)
-#find_library(utils utils-lib)
 add_subdirectory(media)
