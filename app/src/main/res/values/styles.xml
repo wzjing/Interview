@@ -8,4 +8,8 @@
         <item name="colorAccent">@color/colorAccent</item>
     </style>
 
+    <style name="FullScreen" parent="AppTheme">
+        <!-- Prevent error in low api -->
+    </style>
+
 </resources>

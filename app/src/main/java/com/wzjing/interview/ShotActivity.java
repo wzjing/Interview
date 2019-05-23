@@ -3,8 +3,8 @@ package com.wzjing.interview;
 import android.Manifest;
 import android.content.pm.PackageManager;
 import android.content.res.ColorStateList;
-import android.media.MediaRecorder;
 import android.os.Build;
+import android.os.Bundle;
 import android.os.CountDownTimer;
 import android.os.Environment;
 import android.os.SystemClock;
@@ -14,36 +14,29 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
-import android.os.Bundle;
 import android.util.Log;
 import android.view.SurfaceView;
 import android.view.View;
 import android.widget.Chronometer;
 
-import com.wzjing.interview.record.CameraManager;
 import com.wzjing.interview.record.VideoRecorder;
 
 import java.io.File;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 
-public class RecordActivity extends AppCompatActivity {
+public class ShotActivity extends AppCompatActivity {
 
-    private final String TAG = RecordActivity.class.getSimpleName();
+    private final String TAG = ShotActivity.class.getSimpleName();
 
     private final int CODE_PERMISSION_CAMERA = 0x101;
     private final int CODE_PERMISSION_RECORD = 0x102;
     private boolean isPermissionRequesting = false;
-    private boolean recording = false;
 
     private int UI_HIDE;
     private AlertDialog errorDialog;
 
     private FloatingActionButton fabButton;
     private Chronometer timeCounter;
-    private SurfaceView surfaceView;
 
-    //    private CameraManager manager;
     private VideoRecorder recorder;
     private String currentPath = null;
     private int currentIndex = 0;
@@ -80,47 +73,29 @@ public class RecordActivity extends AppCompatActivity {
                 }
             });
         }
-        setContentView(R.layout.activity_record);
-        surfaceView = findViewById(R.id.surfaceView);
+        setContentView(R.layout.activity_shot);
+        SurfaceView surfaceView = findViewById(R.id.surfaceView);
         fabButton = findViewById(R.id.actionFab);
         timeCounter = findViewById(R.id.timeCounter);
-
-//        manager = new CameraManager(surfaceView.getHolder(), 1280, 720);
-//        manager.setListener(new CameraManager.CameraListener() {
-//            @Override
-//            public void onStart() {
-//                Log.d(TAG, "CameraManager start");
-//            }
-//
-//            @Override
-//            public void onClose() {
-//                Log.d(TAG, "CameraManager close");
-//            }
-//
-//            @Override
-//            public void onError(String msg) {
-//                showErrorDialog("Camera error", msg);
-//            }
-//        });
 
         recorder = new VideoRecorder(1280, 720, surfaceView);
 
         recorder.setRecordListener(new VideoRecorder.RecordListener() {
             @Override
             public void onStart() {
-                timeCounter.setTextColor(ContextCompat.getColor(RecordActivity.this, R.color.colorAccent));
+                timeCounter.setTextColor(ContextCompat.getColor(ShotActivity.this, R.color.colorAccent));
                 timeCounter.setBase(SystemClock.elapsedRealtime());
                 timeCounter.start();
                 fabButton.setImageResource(R.drawable.ic_pause);
-                fabButton.setBackgroundTintList(ColorStateList.valueOf(ContextCompat.getColor(RecordActivity.this, R.color.colorAccent)));
+                fabButton.setBackgroundTintList(ColorStateList.valueOf(ContextCompat.getColor(ShotActivity.this, R.color.colorAccent)));
             }
 
             @Override
             public void onStop() {
-                timeCounter.setTextColor(ContextCompat.getColor(RecordActivity.this, R.color.colorPrimary));
+                timeCounter.setTextColor(ContextCompat.getColor(ShotActivity.this, R.color.colorPrimary));
                 timeCounter.stop();
                 fabButton.setImageResource(R.drawable.ic_play);
-                fabButton.setBackgroundTintList(ColorStateList.valueOf(ContextCompat.getColor(RecordActivity.this, R.color.colorPrimary)));
+                fabButton.setBackgroundTintList(ColorStateList.valueOf(ContextCompat.getColor(ShotActivity.this, R.color.colorPrimary)));
                 currentIndex++;
             }
 

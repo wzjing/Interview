@@ -6,28 +6,46 @@
     android:layout_height="match_parent"
     tools:context=".MainActivity">
 
-    <VideoView
-        android:id="@+id/videoView"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintLeft_toLeftOf="parent"
-        app:layout_constraintRight_toRightOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+    <ImageButton
+        android:id="@+id/shotBtn"
+        android:layout_width="100dp"
+        android:layout_height="100dp"
+        android:background="@drawable/selector_button_big"
+        android:padding="20dp"
+        android:scaleType="fitCenter"
+        app:layout_constraintBottom_toTopOf="@+id/videoBtn"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.5"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:srcCompat="@drawable/ic_camera" />
 
-    <android.support.design.widget.FloatingActionButton
-        android:id="@+id/actionFab"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginEnd="24dp"
-        android:layout_marginRight="24dp"
-        android:layout_marginBottom="24dp"
-        android:clickable="true"
-        android:fitsSystemWindows="true"
-        android:focusable="true"
-        app:backgroundTint="@color/colorPrimary"
+    <ImageButton
+        android:id="@+id/videoBtn"
+        android:layout_width="100dp"
+        android:layout_height="100dp"
+        android:background="@drawable/selector_button_big"
+        android:padding="20dp"
+        android:scaleType="fitCenter"
+        app:layout_constraintBottom_toTopOf="@+id/streamBtn"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.5"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/shotBtn"
+        app:srcCompat="@drawable/ic_movie" />
+
+    <ImageButton
+        android:id="@+id/streamBtn"
+        android:layout_width="100dp"
+        android:layout_height="100dp"
+        android:background="@drawable/selector_button_big"
+        android:padding="20dp"
+        android:scaleType="fitCenter"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:srcCompat="@drawable/ic_play" />
+        app:layout_constraintHorizontal_bias="0.5"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/videoBtn"
+        app:srcCompat="@drawable/ic_live_tv" />
 
 </android.support.constraint.ConstraintLayout>
