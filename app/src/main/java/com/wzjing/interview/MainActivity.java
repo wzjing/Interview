@@ -8,6 +8,7 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.media.MediaRecorder;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
@@ -20,11 +21,13 @@ import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.widget.Chronometer;
 import android.widget.ImageView;
+import android.widget.VideoView;
 
 import com.wzjing.interview.record.CameraManager;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.HashMap;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -44,7 +47,6 @@ public class MainActivity extends AppCompatActivity {
 
     private AlertDialog errorDialog;
 
-    private Bitmap bitmap;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -52,36 +54,49 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         FloatingActionButton fabButton = findViewById(R.id.actionFab);
-        ImageView imageView = findViewById(R.id.imageView);
+        VideoView videoView = findViewById(R.id.videoView);
 
         fabButton.setOnClickListener(v -> {
-            long start = System.currentTimeMillis();
-            filterFrame(Environment.getExternalStorageDirectory().getPath() + File.separator + "frame.yuv");
-            Log.d(TAG, "filer time:" + (System.currentTimeMillis() - start));
-//            if (bitmap.isMutable()) {
-//                Canvas canvas = new Canvas(bitmap);
-//                Paint paint = new Paint();
-//                paint.setTextSize(30);
-//                paint.setColor(Color.WHITE);
-//                paint.setTextAlign(Paint.Align.CENTER);
-//                canvas.drawColor(Color.BLACK);
-//                canvas.drawText("Title", canvas.getWidth() / 2, canvas.getHeight() / 2, paint);
-//            } else {
-//                showDialog("Warning", "Bitmap is not mutable");
-//            }
-//            fillBitmap(bitmap, Environment.getExternalStorageDirectory().getPath() + File.separator + "frame.yuv");
-//            imageView.setImageBitmap(bitmap);
+            new Thread(() -> {
+                Log.d(TAG, "start");
+//                long start = System.currentTimeMillis();
+//                String uri = testMux();
+                String uri = "http://10.0.2.2:8080/video.mp4";
+//                Log.d(TAG, "end: " + (System.currentTimeMillis() - start));
+                runOnUiThread(()->{
+                    videoView.setVideoURI(Uri.parse(uri));
+                    videoView.setOnPreparedListener((player)->{
+                        videoView.start();
+                    });
+                });
+            }).start();
         });
 
-        bitmap = Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888);
-        imageView.setImageBitmap(bitmap);
+    }
 
+    private String testMux() {
+        File video = new File(Environment.getExternalStorageDirectory(), "Download/video.ts");
+        VideoEditor editor = new VideoEditor();
+        String uri = Environment.getExternalStorageDirectory() + File.separator + "mux.ts";
+        HashMap<String, File> map = new HashMap<>();
+        map.put("Question: how old are you", video);
+        map.put("Question: what is your skill", video);
+        editor.muxVideos(uri, map, 30, 1);
+        return uri;
+    }
+
+    private String testBGM() {
+        File video = new File(Environment.getExternalStorageDirectory(), "Download/video.ts");
+        File bgm = new File(Environment.getExternalStorageDirectory(), "Download/bgm.aac");
+        String uri = Environment.getExternalStorageDirectory() + File.separator + "mix.ts";
+        VideoEditor editor = new VideoEditor();
+        editor.addBGM(uri, video, bgm, 1.6f);
+        return uri;
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        if (bitmap != null) bitmap.recycle();
     }
 
     private void showDialog(String title, String detail) {
@@ -97,9 +112,5 @@ public class MainActivity extends AppCompatActivity {
             errorDialog.show();
         }
     }
-
-    native void filterFrame(String path);
-
-    native void fillBitmap(Bitmap bitmap, String path);
 
 }

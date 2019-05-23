@@ -1,9 +1,9 @@
-#include "filter.h"
+#include "video_filter.h"
+#include "../utils/log.h"
 
-#include "utils/log.h"
+#define TAG "VideoFilter"
 
-
-int Filter::init(const char *filter_descr,AVPixelFormat in_fmt,  AVPixelFormat out_fmt) {
+int VideoFilter::create(const char *filter_descr, VideoConfig *inConfig, VideoConfig *outConfig) {
     this->description = filter_descr;
     char args[512];
     int ret = 0;
@@ -11,8 +11,7 @@ int Filter::init(const char *filter_descr,AVPixelFormat in_fmt,  AVPixelFormat o
     const AVFilter *buffersink = avfilter_get_by_name("buffersink");
     AVFilterInOut *outputs = avfilter_inout_alloc();
     AVFilterInOut *inputs = avfilter_inout_alloc();
-    AVRational time_base = {1, 1};
-    enum AVPixelFormat pix_fmts[] = {out_fmt, AV_PIX_FMT_NONE};
+    enum AVPixelFormat pix_fmts[] = {outConfig->format, AV_PIX_FMT_NONE};
 
     filter_graph = avfilter_graph_alloc();
     if (!outputs || !inputs || !filter_graph) {
@@ -20,13 +19,11 @@ int Filter::init(const char *filter_descr,AVPixelFormat in_fmt,  AVPixelFormat o
         goto end;
     }
 
-    /* buffer video source: the decoded frames from the decoder will be inserted here. */
     snprintf(args, sizeof(args),
              "video_size=%dx%d:pix_fmt=%d:time_base=%d/%d:pixel_aspect=%d/%d",
-             1920, 1080, in_fmt,
-             time_base.num, time_base.den,
-             16, 9);
-
+             inConfig->width, inConfig->height, inConfig->format,
+             inConfig->timebase.num, inConfig->timebase.den,
+             inConfig->pixel_aspect.num, inConfig->pixel_aspect.num);
     ret = avfilter_graph_create_filter(&buffersrc_ctx, buffersrc, "in",
                                        args, nullptr, filter_graph);
     if (ret < 0) {
@@ -34,7 +31,6 @@ int Filter::init(const char *filter_descr,AVPixelFormat in_fmt,  AVPixelFormat o
         goto end;
     }
 
-    /* buffer video sink: to terminate the filter chain. */
     ret = avfilter_graph_create_filter(&buffersink_ctx, buffersink, "out",
                                        nullptr, nullptr, filter_graph);
     if (ret < 0) {
@@ -77,50 +73,26 @@ int Filter::init(const char *filter_descr,AVPixelFormat in_fmt,  AVPixelFormat o
     return ret;
 }
 
-AVFilterContext *Filter::getInputCtx() {
-    return buffersrc_ctx;
-}
+int VideoFilter::filter(AVFrame *source, AVFrame *dest) {
 
-AVFilterContext *Filter::getOutputCtx() {
-    return buffersink_ctx;
-}
-
-void Filter::dumpGraph() {
-    LOGD(TAG, "Filter graph for\"%s\"\n%s\n", this->description,
-         avfilter_graph_dump(filter_graph, nullptr));
-}
-
-void Filter::filter(AVFrame *src, AVFrame *dest) {
-    int ret = av_buffersrc_add_frame(getInputCtx(), src);
+    int ret = av_buffersrc_add_frame_flags(buffersrc_ctx, source, AV_BUFFERSRC_FLAG_KEEP_REF);
     if (ret < 0) {
-        LOGE(TAG, "add input error: %s\n", av_err2str(ret));
-        return;
+        LOGE(TAG, "unable to add frame to filter chain\n");
+        return -1;
     }
-    ret = av_buffersink_get_frame(getOutputCtx(), dest);
-    if (ret == 0) {
-        LOGD(TAG, "Frame format: %s\n", av_get_pix_fmt_name((AVPixelFormat) dest->format));
-        for (int j = 0; dest->linesize[j]; ++j) {
-            LOGD(TAG, "Frame buffer %d: %d\n", j, dest->linesize[j]);
-        }
+    ret = av_buffersink_get_frame(buffersink_ctx, dest);
+    if (ret < 0) {
+        LOGE(TAG, "unable to get frame from filter chain\n");
+        return -1;
     }
+    return 0;
 }
 
-void Filter::filter(AVFrame *frame) {
-    int ret = av_buffersrc_add_frame(getInputCtx(), frame);
-    if (ret < 0) {
-        av_frame_unref(frame);
-        LOGE(TAG, "filter() input error: %s\n", av_err2str(ret));
-        return;
-    }
-    av_frame_unref(frame);
-    ret = av_buffersink_get_frame(getOutputCtx(), frame);
-    if (ret == 0) {
-        LOGD(TAG, "filter() done: %s\n", description);
-        for (int j = 0; frame->linesize[j]; ++j) {
-            LOGD(TAG, "Frame buffer %d: %d\n", j, frame->linesize[j]);
-        }
-        LOGD(TAG, "Format: %s\n", av_get_pix_fmt_name((AVPixelFormat)frame->format));
-    } else {
-        LOGE(TAG, "filter() error: %s\n", av_err2str(ret));
-    }
+void VideoFilter::dumpGraph() {
+    LOGD(TAG, "Video Filer(%s):\n%s\n", this->description, avfilter_graph_dump(filter_graph, nullptr));
+}
+
+void VideoFilter::destroy() {
+    if (filter_graph)
+        avfilter_graph_free(&filter_graph);
 }

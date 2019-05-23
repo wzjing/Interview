@@ -2,10 +2,11 @@
 // Created by android1 on 2019/5/22.
 //
 
-#include "bitmap_utils.h"
-#include "jni_common.h"
+#include "bitmap_utils.h"\
 #include <cstring>
 #include "log.h"
+
+#define JNI_CLASS(sub_clazz) "com/wzjing/interview/" sub_clazz
 
 const char *Bimap_TAG = "bitmap_utils";
 
