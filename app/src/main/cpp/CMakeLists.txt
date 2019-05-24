@@ -11,12 +11,15 @@ add_library(native-lib SHARED
         filters/audio_filter.cpp
         filters/video_filter.h
         filters/video_filter.cpp
-        native-lib.cpp
+        remux/remux.h
+        remux/remux.cpp
         utils/log.h
         utils/log.cpp
-        utils/error.h
         utils/bitmap_utils.h
-        utils/bitmap_utils.cpp)
+        utils/bitmap_utils.cpp
+        utils/error.h
+        native-lib.cpp
+        )
 
 function(import_library name type filename)
     add_library(${name} ${type} IMPORTED)

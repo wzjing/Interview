@@ -4,7 +4,6 @@
 
 #include "mix_bgm.h"
 #include "../utils/log.h"
-#include "../utils/error.h"
 #include "../filters/audio_filter.h"
 
 extern "C" {
@@ -19,9 +18,15 @@ int openAudioFile(const char *file, AVFormatContext *&formatContext, AVCodecCont
                   AVStream *&audioStream) {
     int ret = 0;
     ret = avformat_open_input(&formatContext, file, nullptr, nullptr);
-    if (ret < 0) return error(ret, "input format error");
+    if (ret < 0) {
+        LOGE(TAG, "input format error: %s\n", av_err2str(ret));
+        return -1;
+    }
     ret = avformat_find_stream_info(formatContext, nullptr);
-    if (ret < 0) return error(ret, "input format info error");
+    if (ret < 0) {
+        LOGE(TAG, "input format info error: %s\n", av_err2str(ret));
+        return -1;
+    }
 
     for (int j = 0; j < formatContext->nb_streams; ++j) {
         if (formatContext->streams[j]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
@@ -43,9 +48,15 @@ int openVideoFile(const char *file, AVFormatContext *&formatContext, AVCodecCont
                   AVCodecContext *&videoContext, AVStream *&audioStream, AVStream *&videoStream) {
     int ret = 0;
     ret = avformat_open_input(&formatContext, file, nullptr, nullptr);
-    if (ret < 0) return error(ret, "input format error");
+    if (ret < 0) {
+        LOGE(TAG, "input format error: %s\n", av_err2str(ret));
+        return -1;
+    }
     ret = avformat_find_stream_info(formatContext, nullptr);
-    if (ret < 0) return error(ret, "input format info error");
+    if (ret < 0) {
+        LOGE(TAG, "find stream info error: %s\n", av_err2str(ret));
+        return -1;
+    }
 
     for (int j = 0; j < formatContext->nb_streams; ++j) {
         if (formatContext->streams[j]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
@@ -80,7 +91,7 @@ int mix_bgm(const char *output_filename, const char *input_filename, const char 
     AVCodecContext *inAudioContext = nullptr;
     AVCodecContext *inVideoContext = nullptr;
     AVCodecContext *outAudioContext = nullptr;
-    AVCodecContext *outVideoContext = nullptr;
+//    AVCodecContext *outVideoContext = nullptr;
     AVCodecContext *bgmAudioContext = nullptr;
 
     AVStream *inAudioStream = nullptr;
@@ -89,7 +100,7 @@ int mix_bgm(const char *output_filename, const char *input_filename, const char 
     AVStream *outVideoStream = nullptr;
     AVStream *bgmAudioStream = nullptr;
 
-    AVCodec *videoCodec = nullptr;
+//    AVCodec *videoCodec = nullptr;
     AVCodec *audioCodec = nullptr;
 
     openVideoFile(input_filename, inFmtContext, inAudioContext, inVideoContext, inAudioStream,
@@ -98,19 +109,28 @@ int mix_bgm(const char *output_filename, const char *input_filename, const char 
 
     // configure output
     ret = avformat_alloc_output_context2(&outFmtContext, nullptr, nullptr, output_filename);
-    if (ret < 0) return error(ret, "output format error");
+    if (ret < 0) {
+        LOGE(TAG, "output format error: %s\n", av_err2str(ret));
+        return -1;
+    }
 
     // Copy codec from input video AVStream
-    videoCodec = avcodec_find_encoder(inVideoStream->codecpar->codec_id);
+//    videoCodec = avcodec_find_encoder(inVideoStream->codecpar->codec_id);
     audioCodec = avcodec_find_encoder(inAudioStream->codecpar->codec_id);
 
     // create output Video AVStream
-    outVideoStream = avformat_new_stream(outFmtContext, videoCodec);
+    outVideoStream = avformat_new_stream(outFmtContext, nullptr);
     if (!outVideoStream) {
         LOGE(TAG, "create output video stream error\n");
         return -1;
     }
-    outVideoStream->id = outFmtContext->nb_streams - 1;
+    outVideoStream->index = outFmtContext->nb_streams - 1;
+    ret = avcodec_parameters_copy(outVideoStream->codecpar, inVideoStream->codecpar);
+    if (ret < 0) {
+        LOGE(TAG, "unable to copy video stream code parameter: %s\n", av_err2str(ret));
+        return -1;
+    }
+    outVideoStream->codecpar->codec_tag = 0;
 
     outAudioStream = avformat_new_stream(outFmtContext, audioCodec);
     if (!outAudioStream) {
@@ -118,26 +138,26 @@ int mix_bgm(const char *output_filename, const char *input_filename, const char 
         LOGE(TAG, "create output audio stream error\n");
         return -1;
     }
-    outAudioStream->id = outFmtContext->nb_streams - 1;
+    outAudioStream->index = outFmtContext->nb_streams - 1;
 
-    outVideoContext = avcodec_alloc_context3(videoCodec);
-    outVideoContext->codec_id = inVideoContext->codec_id;
-    outVideoContext->width = inVideoContext->width;
-    outVideoContext->height = inVideoContext->height;
-    outVideoContext->pix_fmt = inVideoContext->pix_fmt;
-    outVideoContext->bit_rate = inVideoContext->bit_rate;
-    outVideoContext->has_b_frames = inVideoContext->has_b_frames;
-    outVideoContext->gop_size = inVideoContext->gop_size;
-    outVideoContext->qmin = inVideoContext->qmin;
-    outVideoContext->qmax = inVideoContext->qmax;
-    outVideoContext->time_base = (AVRational) {inVideoStream->r_frame_rate.den,
-                                               inVideoStream->r_frame_rate.num};
-    outVideoContext->profile = inVideoContext->profile;
-    outVideoStream->time_base = outVideoContext->time_base;
-    ret = avcodec_open2(outVideoContext, videoCodec, nullptr);
-    if (ret < 0) return error(ret, "Open Video output AVCodecContext");
-    ret = avcodec_parameters_from_context(outVideoStream->codecpar, outVideoContext);
-    if (ret < 0) return error(ret, "Copy Video Context to output stream");
+//    outVideoContext = avcodec_alloc_context3(videoCodec);
+//    outVideoContext->codec_id = inVideoContext->codec_id;
+//    outVideoContext->width = inVideoContext->width;
+//    outVideoContext->height = inVideoContext->height;
+//    outVideoContext->pix_fmt = inVideoContext->pix_fmt;
+//    outVideoContext->bit_rate = inVideoContext->bit_rate;
+//    outVideoContext->has_b_frames = inVideoContext->has_b_frames;
+//    outVideoContext->gop_size = inVideoContext->gop_size;
+//    outVideoContext->qmin = inVideoContext->qmin;
+//    outVideoContext->qmax = inVideoContext->qmax;
+//    outVideoContext->time_base = (AVRational) {inVideoStream->r_frame_rate.den,
+//                                               inVideoStream->r_frame_rate.num};
+//    outVideoContext->profile = inVideoContext->profile;
+//    outVideoStream->time_base = outVideoContext->time_base;
+//    ret = avcodec_open2(outVideoContext, videoCodec, nullptr);
+//    if (ret < 0) return error(ret, "Open Video output AVCodecContext");
+//    ret = avcodec_parameters_from_context(outVideoStream->codecpar, outVideoContext);
+//    if (ret < 0) return error(ret, "Copy Video Context to output stream");
 
     // Copy Audio Stream Configure from base Fragment
     outAudioContext = avcodec_alloc_context3(audioCodec);
@@ -151,9 +171,15 @@ int mix_bgm(const char *output_filename, const char *input_filename, const char 
     outAudioContext->time_base = (AVRational) {1, outAudioContext->sample_rate};
     outAudioStream->time_base = outAudioContext->time_base;
     ret = avcodec_open2(outAudioContext, audioCodec, nullptr);
-    if (ret < 0) return error(ret, "Open Audio output AVCodecContext");
+    if (ret < 0) {
+        LOGE(TAG, "open audio AVCodecContext error: %s\n", av_err2str(ret));
+        return -1;
+    }
     ret = avcodec_parameters_from_context(outAudioStream->codecpar, outAudioContext);
-    if (ret < 0) return error(ret, "Copy Audio Context to output stream");
+    if (ret < 0) {
+        LOGE(TAG, "copy parameter to audio stream error: %s\n", av_err2str(ret));
+        return -1;
+    }
 
     if (!(outFmtContext->oformat->flags & AVFMT_NOFILE)) {
         LOGD(TAG, "Opening file: %s\n", output_filename);
@@ -165,7 +191,10 @@ int mix_bgm(const char *output_filename, const char *input_filename, const char 
     }
 
     ret = avformat_write_header(outFmtContext, nullptr);
-    if (ret < 0) return error(ret, "write header error");
+    if (ret < 0) {
+        LOGE(TAG, "write header error: %s\n", av_err2str(ret));
+        return -1;
+    }
 
     AVPacket *packet = av_packet_alloc();
     AVPacket *bgmPacket = av_packet_alloc();
@@ -309,7 +338,7 @@ int mix_bgm(const char *output_filename, const char *input_filename, const char 
     avcodec_free_context(&inVideoContext);
     avcodec_free_context(&bgmAudioContext);
     avcodec_free_context(&outAudioContext);
-    avcodec_free_context(&outVideoContext);
+//    avcodec_free_context(&outVideoContext);
 
     return 0;
 }

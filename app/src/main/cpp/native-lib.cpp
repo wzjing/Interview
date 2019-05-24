@@ -2,8 +2,12 @@
 #include "utils/log.h"
 #include "concat/concat_add_title.h"
 #include "bgm/mix_bgm.h"
+#include "remux/remux.h"
+#include <cstring>
 
 #define TAG "native-lib"
+
+#include <regex>
 
 
 extern "C"
@@ -14,20 +18,52 @@ Java_com_wzjing_interview_VideoEditor_nativeMuxVideos(JNIEnv *env, jobject insta
                                                       jobjectArray titles,
                                                       jint inputNum,
                                                       jint fontSize, jint duration) {
-    const char *output_filename = env->GetStringUTFChars(outputFilename, 0);
+    const char *output_filename = env->GetStringUTFChars(outputFilename, JNI_FALSE);
     const char **input_filenames = (const char **) malloc(sizeof(char *) * inputNum);
     for (int i = 0; i < inputNum; ++i) {
         auto jstr = (jstring) env->GetObjectArrayElement(inputFilenames, i);
-        input_filenames[i] = env->GetStringUTFChars(jstr, 0);
+        input_filenames[i] = env->GetStringUTFChars(jstr, JNI_FALSE);
     }
     const char **titles_ = (const char **) malloc(sizeof(char *) * inputNum);
     for (int i = 0; i < inputNum; ++i) {
         auto jstr = (jstring) env->GetObjectArrayElement(titles, i);
-        titles_[i] = env->GetStringUTFChars(jstr, 0);
+        titles_[i] = env->GetStringUTFChars(jstr, JNI_FALSE);
     }
 
-    int ret = concat_add_title(env, output_filename, input_filenames, titles_, inputNum, fontSize,
+    char *inputs_arr = (char*)calloc(512, sizeof(char));
+    for (int i = 0; i < inputNum; ++i) {
+        strcat(inputs_arr, input_filenames[i]);
+        strcat(inputs_arr, ", ");
+    }
+
+    char *titles_arr = (char*)calloc(512, sizeof(char));
+    for (int i = 0; i < inputNum; ++i) {
+        strcat(titles_arr, titles_[i]);
+        strcat(titles_arr, ", ");
+    }
+
+    LOGD(TAG, "nativeMuxVideos(%s, {%s}, {%s}, %d, %d, %d)\n", output_filename, inputs_arr,
+         titles_arr, inputNum, fontSize, duration);
+
+
+    std::string cache_filename;
+
+    cache_filename = std::regex_replace(output_filename, std::regex(".[0-9a-zA-Z]+$"), "_cache.ts");
+
+    LOGD(TAG, "cache file: %s\n", cache_filename.c_str());
+
+
+//    char cache_filename[128];
+//    snprintf(cache_filename, sizeof(cache_filename), "%s.ts", output_filename);
+
+    int ret = concat_add_title(env, cache_filename.c_str(), input_filenames, titles_, inputNum,
+                               fontSize,
                                duration);
+
+    if (ret == 0) {
+        ret = remux(cache_filename.c_str(), output_filename);
+    }
+
 
     for (int i = 0; i < inputNum; ++i) {
         auto jstr = (jstring) env->GetObjectArrayElement(titles, i);
@@ -50,9 +86,9 @@ Java_com_wzjing_interview_VideoEditor_nativeAddBGM(JNIEnv *env, jobject instance
                                                    jstring outputFilename,
                                                    jstring inputFilename, jstring bgmFilename,
                                                    jfloat relativeBGMVolume) {
-    const char *output_filename = env->GetStringUTFChars(outputFilename, 0);
-    const char *input_filename = env->GetStringUTFChars(inputFilename, 0);
-    const char *bgm_filename = env->GetStringUTFChars(bgmFilename, 0);
+    const char *output_filename = env->GetStringUTFChars(outputFilename, JNI_FALSE);
+    const char *input_filename = env->GetStringUTFChars(inputFilename, JNI_FALSE);
+    const char *bgm_filename = env->GetStringUTFChars(bgmFilename, JNI_FALSE);
 
     int ret = mix_bgm(output_filename, input_filename, bgm_filename, relativeBGMVolume);
 

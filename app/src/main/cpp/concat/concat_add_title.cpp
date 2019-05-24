@@ -1,6 +1,5 @@
 #include "../utils/bitmap_utils.h"
 #include "../utils/log.h"
-#include "../utils/error.h"
 #include "../filters/video_filter.h"
 
 extern "C" {
@@ -123,7 +122,7 @@ int encode_title(JNIEnv *env, const char *title, int fontSize, AVFormatContext *
                     packet->dts += video_start_dts;
                     next_video_pts = packet->pts + srcVideoFrame->pkt_duration;
                     next_video_dts = packet->dts + srcVideoFrame->pkt_duration;
-                    logPacket(packet, "V");
+//                    logPacket(packet, "V");
                     ret = av_interleaved_write_frame(formatContext, packet);
                     if (ret < 0) {
                         LOGE(TAG, "write video frame error: %s\n", av_err2str(ret));
@@ -180,7 +179,7 @@ int encode_title(JNIEnv *env, const char *title, int fontSize, AVFormatContext *
 //                    if (packet->pts <= (next_audio_pts - srcAudioFrame->pkt_duration)) continue;
                     next_audio_pts = packet->pts + srcAudioFrame->pkt_duration;
                     next_audio_dts = packet->dts + srcAudioFrame->pkt_duration;
-                    logPacket(packet, "A");
+//                    logPacket(packet, "A");
                     ret = av_interleaved_write_frame(formatContext, packet);
                     if (ret < 0) {
                         LOGE(TAG, "write audio frame error: %s\n", av_err2str(ret));
@@ -218,16 +217,20 @@ int encode_title(JNIEnv *env, const char *title, int fontSize, AVFormatContext *
 }
 
 int concat_add_title(JNIEnv *env, const char *output_filename,
-                     const char **input_filenames, const char **titles, size_t nb_inputs, int font_size,
+                     const char **input_filenames, const char **titles, size_t nb_inputs,
+                     int font_size,
                      int title_duration) {
     TITLE_DURATION = title_duration;
     int ret = 0;
     // input fragments
     auto **videos = (Video **) malloc(nb_inputs * sizeof(Video *));
 
+    LOGD(TAG, "d1");
+
     for (int i = 0; i < nb_inputs; ++i) {
         videos[i] = (Video *) malloc(sizeof(Video));
     }
+    LOGD(TAG, "d2");
 
     // output video
     AVFormatContext *outFmtContext = nullptr;
@@ -239,10 +242,19 @@ int concat_add_title(JNIEnv *env, const char *output_filename,
     AVCodec *outAudioCodec = nullptr;
 
     for (int i = 0; i < nb_inputs; ++i) {
+        LOGD(TAG, "loop: %s\n", input_filenames[i]);
         ret = avformat_open_input(&videos[i]->formatContext, input_filenames[i], nullptr, nullptr);
-        if (ret < 0) return error(ret, "input format error");
+        if (ret < 0) {
+            LOGE(TAG, "input format error: %s\n", av_err2str(ret));
+            return -1;
+        }
+        LOGD(TAG, "loop2: %s\n", input_filenames[i]);
         ret = avformat_find_stream_info(videos[i]->formatContext, nullptr);
-        if (ret < 0) return error(ret, "input format info error");
+        if (ret < 0) {
+            LOGE(TAG, "input format info error: %s\n", av_err2str(ret));
+            return -1;
+        }
+        LOGD(TAG, "loop3: %s\n", input_filenames[i]);
         for (int j = 0; j < videos[i]->formatContext->nb_streams; ++j) {
             if (videos[i]->formatContext->streams[j]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
                 videos[i]->videoStream = videos[i]->formatContext->streams[j];
@@ -262,9 +274,8 @@ int concat_add_title(JNIEnv *env, const char *output_filename,
             }
             if (videos[i]->videoStream && videos[i]->audioStream) break;
         }
-        if (videos[i]->formatContext->iformat->name) {
 
-        }
+        LOGD(TAG, "loop4: %s\n", input_filenames[i]);
         videos[i]->isTsVideo = strcmp(videos[i]->formatContext->iformat->name, "mpegts") == 0;
 
         LOGD(TAG, "\n"
@@ -275,22 +286,37 @@ int concat_add_title(JNIEnv *env, const char *output_filename,
              input_filenames[i]);
     }
 
+    LOGD(TAG, "debug1");
+
     // create output AVFormatContext
     ret = avformat_alloc_output_context2(&outFmtContext, nullptr, "mpegts", output_filename);
-    if (ret < 0) return error(ret, "output format error");
+    if (ret < 0) {
+        LOGE(TAG, "output format error: %s\n", av_err2str(ret));
+        return -1;
+    }
+    LOGD(TAG, "debug2");
 
     // Copy codec from input video AVStream
     outVideoCodec = avcodec_find_encoder(videos[0]->videoStream->codecpar->codec_id);
     outAudioCodec = avcodec_find_encoder(videos[0]->audioStream->codecpar->codec_id);
+    LOGD(TAG, "debug3");
 
     // create output Video AVStream
     outVideoStream = avformat_new_stream(outFmtContext, outVideoCodec);
-    if (!outVideoStream) return error(ret, "create output video stream error");
+    if (ret < 0) {
+        LOGE(TAG, "create video stream error: %s\n", av_err2str(ret));
+        return -1;
+    }
     outVideoStream->id = 0;
+    LOGD(TAG, "debug4");
 
     outAudioStream = avformat_new_stream(outFmtContext, outAudioCodec);
-    if (!outAudioStream) return error(ret, "create output audio stream error");
+    if (ret < 0) {
+        LOGE(TAG, "create audio stream error: %s\n", av_err2str(ret));
+        return -1;
+    }
     outAudioStream->id = 1;
+    LOGD(TAG, "debug5");
 
     Video *baseVideo = videos[0]; // the result code is based on this video
 
@@ -315,9 +341,16 @@ int concat_add_title(JNIEnv *env, const char *output_filename,
         av_dict_set(&opt, "tune", "zerolatency", 0);
     }
     ret = avcodec_open2(outVideoContext, outVideoCodec, &opt);
-    if (ret < 0) return error(ret, "Open Video output AVCodecContext");
+    if (ret < 0) {
+        LOGE(TAG, "open output video AVCodecContext error: %s\n", av_err2str(ret));
+        return -1;
+    }
     ret = avcodec_parameters_from_context(outVideoStream->codecpar, outVideoContext);
-    if (ret < 0) return error(ret, "Copy Video Context to output stream");
+    if (ret < 0) {
+        LOGE(TAG, "copy output video parameter error: %s\n", av_err2str(ret));
+        return -1;
+    }
+    LOGD(TAG, "debug6");
 
     // Copy Audio Stream Configure from base Video
     outAudioContext = avcodec_alloc_context3(outAudioCodec);
@@ -333,13 +366,19 @@ int concat_add_title(JNIEnv *env, const char *output_filename,
     outAudioStream->time_base = outAudioContext->time_base;
     av_dict_free(&opt);
     opt = nullptr;
-    if (outVideoContext->codec_id == AV_CODEC_ID_AAC) {
-        av_dict_set(&opt, "profile", "23", 0);
-    }
+//    if (outVideoContext->codec_id == AV_CODEC_ID_AAC) {
+//        av_dict_set(&opt, "profile", "23", 0);
+//    }
     ret = avcodec_open2(outAudioContext, outAudioCodec, &opt);
-    if (ret < 0) return error(ret, "Open Audio output AVCodecContext");
+    if (ret < 0) {
+        LOGE(TAG, "open output audio AVCodecContext error: %s\n", av_err2str(ret));
+        return -1;
+    }
     ret = avcodec_parameters_from_context(outAudioStream->codecpar, outAudioContext);
-    if (ret < 0) return error(ret, "Copy Audio Context to output stream");
+    if (ret < 0) {
+        LOGE(TAG, "copy output audio parameter error: %s\n", av_err2str(ret));
+        return -1;
+    }
 
     if (!(outFmtContext->oformat->flags & AVFMT_NOFILE)) {
         LOGD(TAG, "Opening file: %s\n", output_filename);
@@ -349,12 +388,18 @@ int concat_add_title(JNIEnv *env, const char *output_filename,
             return -1;
         }
     }
+    LOGD(TAG, "debug7");
 
     ret = avformat_write_header(outFmtContext, nullptr);
-    if (ret < 0) return error(ret, "write header error");
+    if (ret < 0) {
+        LOGE(TAG, "write header error: %s\n", av_err2str(ret));
+        return -1;
+    }
 
+    LOGD(TAG, "debug8");
 
     av_dump_format(outFmtContext, 0, output_filename, 1);
+    LOGD(TAG, "debug9");
 
     AVPacket *packet = av_packet_alloc();
     AVFrame *videoFrame = av_frame_alloc();
@@ -364,6 +409,7 @@ int concat_add_title(JNIEnv *env, const char *output_filename,
     int64_t last_video_dts = 0;
     int64_t last_audio_pts = 0;
     int64_t last_audio_dts = 0;
+    LOGD(TAG, "debug10");
 
 
     for (int i = 0; i < nb_inputs; ++i) {
@@ -518,7 +564,7 @@ int concat_add_title(JNIEnv *env, const char *output_filename,
                     next_video_pts = annexPacket->pts + annexPacket->duration;
                     next_video_dts = annexPacket->dts + annexPacket->duration;
 
-                    logPacket(annexPacket, "V");
+//                    logPacket(annexPacket, "V");
                     av_interleaved_write_frame(outFmtContext, annexPacket);
                     av_packet_free(&annexPacket);
                 } else {
@@ -539,7 +585,7 @@ int concat_add_title(JNIEnv *env, const char *output_filename,
                     next_video_pts = packet->pts + packet->duration;
                     next_video_dts = packet->dts + packet->duration;
 
-                    logPacket(packet, "V");
+//                    logPacket(packet, "V");
 
                     av_interleaved_write_frame(outFmtContext, packet);
                 }

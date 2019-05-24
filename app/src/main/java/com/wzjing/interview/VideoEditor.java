@@ -43,6 +43,7 @@ public class VideoEditor {
                 return false;
             }
             filenames[i] = file.getAbsolutePath();
+            Log.d(TAG, "input: " + filenames[i]);
             i++;
         }
 
