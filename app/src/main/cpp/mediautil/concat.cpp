@@ -1,6 +1,8 @@
-#include "../utils/bitmap_utils.h"
-#include "../utils/log.h"
-#include "../filters/video_filter.h"
+#include "log.h"
+#include "video_filter.h"
+#include "bitmap_utils.h"
+
+#include "concat.h"
 
 extern "C" {
 #include <libavformat/avformat.h>
@@ -8,19 +10,27 @@ extern "C" {
 #include <libavutil/avutil.h>
 }
 
-#include "concat_add_title.h"
+struct Video {
+    AVFormatContext *formatContext = nullptr;
+    AVStream *videoStream = nullptr;
+    AVStream *audioStream = nullptr;
+    AVCodecContext *audioCodecContext = nullptr;
+    AVCodecContext *videoCodecContext = nullptr;
+    int isTsVideo = 0;
 
+};
 
-static int TITLE_DURATION = 2;
+#define TAG "concat"
 
-#define TAG "Concat"
+static int titleDuration = 2;
+static int fontSize = 40;
 
-int encode_title(JNIEnv *env, const char *title, int fontSize, AVFormatContext *formatContext,
+int encode_title(JNIEnv *env, const char *title, AVFormatContext *formatContext,
                  AVFrame *srcAudioFrame, AVFrame *srcVideoFrame,
                  AVCodecContext *audioCodecContext, AVCodecContext *videoCodecContext,
                  AVStream *audioStream, AVStream *videoStream,
-                 int64_t &audio_start_pts, int64_t &audio_start_dts,
-                 int64_t &video_start_pts, int64_t &video_start_dts) {
+                 uint64_t &audio_start_pts, uint64_t &audio_start_dts,
+                 uint64_t &video_start_pts, uint64_t &video_start_dts) {
 
     int encode_video = 1;
     int encode_audio = 1;
@@ -41,10 +51,10 @@ int encode_title(JNIEnv *env, const char *title, int fontSize, AVFormatContext *
     int64_t video_frame_pts = 0;
     int64_t audio_frame_pts = 0;
 
-    int64_t next_video_pts = 0;
-    int64_t next_video_dts = 0;
-    int64_t next_audio_pts = 0;
-    int64_t next_audio_dts = 0;
+    uint64_t next_video_pts = 0;
+    uint64_t next_video_dts = 0;
+    uint64_t next_audio_pts = 0;
+    uint64_t next_audio_dts = 0;
 
     int sample_size = 0;
 
@@ -90,11 +100,10 @@ int encode_title(JNIEnv *env, const char *title, int fontSize, AVFormatContext *
     }
 
     while (encode_video || encode_audio) {
-        if (!encode_audio ||
-            (encode_video && av_compare_ts(video_frame_pts, videoCodecContext->time_base,
-                                           audio_frame_pts, audioCodecContext->time_base) <= 0)) {
+        if (!encode_audio || (encode_video && av_compare_ts(video_frame_pts, videoCodecContext->time_base,
+                                                            audio_frame_pts, audioCodecContext->time_base) <= 0)) {
             if (av_compare_ts(video_frame_pts, videoCodecContext->time_base,
-                              TITLE_DURATION, (AVRational) {1, 1}) > 0) {
+                              titleDuration, (AVRational) {1, 1}) > 0) {
                 encode_video = 0;
             } else {
                 ret = av_frame_copy(videoFrame, srcVideoFrame);
@@ -109,20 +118,20 @@ int encode_title(JNIEnv *env, const char *title, int fontSize, AVFormatContext *
                 }
                 videoFrame->pts = video_frame_pts;
                 video_frame_pts += 1;
-//                logFrame(videoFrame, "Out", 1);
                 avcodec_send_frame(videoCodecContext, videoFrame);
             }
             while (true) {
                 ret = avcodec_receive_packet(videoCodecContext, packet);
                 if (ret == 0) {
-                    av_packet_rescale_ts(packet, videoCodecContext->time_base,
-                                         videoStream->time_base);
+                    av_packet_rescale_ts(packet, videoCodecContext->time_base, videoStream->time_base);
                     packet->stream_index = videoStream->index;
                     packet->pts += video_start_pts;
                     packet->dts += video_start_dts;
                     next_video_pts = packet->pts + srcVideoFrame->pkt_duration;
                     next_video_dts = packet->dts + srcVideoFrame->pkt_duration;
-//                    logPacket(packet, "V");
+#ifdef DEBUG
+                    logPacket(packet, &videoStream->time_base, "V");
+#endif
                     ret = av_interleaved_write_frame(formatContext, packet);
                     if (ret < 0) {
                         LOGE(TAG, "write video frame error: %s\n", av_err2str(ret));
@@ -141,7 +150,7 @@ int encode_title(JNIEnv *env, const char *title, int fontSize, AVFormatContext *
             }
         } else {
             if (av_compare_ts(audio_frame_pts, audioCodecContext->time_base,
-                              TITLE_DURATION, (AVRational) {1, 1}) >= 0) {
+                              titleDuration, (AVRational) {1, 1}) >= 0) {
                 encode_audio = 0;
             } else {
                 audioFrame->format = audioCodecContext->sample_fmt;
@@ -170,8 +179,7 @@ int encode_title(JNIEnv *env, const char *title, int fontSize, AVFormatContext *
                     }
 //                    if (packet->pts < 0) continue;
                     if (!first_audio_set) continue;
-                    av_packet_rescale_ts(packet, audioCodecContext->time_base,
-                                         audioStream->time_base);
+                    av_packet_rescale_ts(packet, audioCodecContext->time_base, audioStream->time_base);
                     packet->stream_index = audioStream->index;
                     packet->pts += audio_start_pts;
                     packet->dts += audio_start_dts;
@@ -179,7 +187,9 @@ int encode_title(JNIEnv *env, const char *title, int fontSize, AVFormatContext *
 //                    if (packet->pts <= (next_audio_pts - srcAudioFrame->pkt_duration)) continue;
                     next_audio_pts = packet->pts + srcAudioFrame->pkt_duration;
                     next_audio_dts = packet->dts + srcAudioFrame->pkt_duration;
-//                    logPacket(packet, "A");
+#ifdef DEBUG
+                    logPacket(packet, &audioStream->time_base, "A");
+#endif
                     ret = av_interleaved_write_frame(formatContext, packet);
                     if (ret < 0) {
                         LOGE(TAG, "write audio frame error: %s\n", av_err2str(ret));
@@ -216,21 +226,21 @@ int encode_title(JNIEnv *env, const char *title, int fontSize, AVFormatContext *
     return -1;
 }
 
-int concat_add_title(JNIEnv *env, const char *output_filename,
-                     const char **input_filenames, const char **titles, size_t nb_inputs,
+int concat_add_title(JNIEnv* env, const char *output_filename, const char **input_filenames, const char** titles, int nb_inputs,
                      int font_size,
                      int title_duration) {
-    TITLE_DURATION = title_duration;
+
+    fontSize = font_size;
+    titleDuration = title_duration;
+
     int ret = 0;
     // input fragments
     auto **videos = (Video **) malloc(nb_inputs * sizeof(Video *));
 
-    LOGD(TAG, "d1");
-
     for (int i = 0; i < nb_inputs; ++i) {
         videos[i] = (Video *) malloc(sizeof(Video));
+        videos[i]->formatContext = nullptr;
     }
-    LOGD(TAG, "d2");
 
     // output video
     AVFormatContext *outFmtContext = nullptr;
@@ -242,83 +252,71 @@ int concat_add_title(JNIEnv *env, const char *output_filename,
     AVCodec *outAudioCodec = nullptr;
 
     for (int i = 0; i < nb_inputs; ++i) {
-        LOGD(TAG, "loop: %s\n", input_filenames[i]);
         ret = avformat_open_input(&videos[i]->formatContext, input_filenames[i], nullptr, nullptr);
         if (ret < 0) {
-            LOGE(TAG, "input format error: %s\n", av_err2str(ret));
+            LOGE(TAG, "open file %s error: %s\n", input_filenames[i], av_err2str(ret));
             return -1;
         }
-        LOGD(TAG, "loop2: %s\n", input_filenames[i]);
         ret = avformat_find_stream_info(videos[i]->formatContext, nullptr);
         if (ret < 0) {
-            LOGE(TAG, "input format info error: %s\n", av_err2str(ret));
+            LOGE(TAG, "unable to find stream info for %s: %s\n", input_filenames[i], av_err2str(ret));
             return -1;
         }
-        LOGD(TAG, "loop3: %s\n", input_filenames[i]);
         for (int j = 0; j < videos[i]->formatContext->nb_streams; ++j) {
             if (videos[i]->formatContext->streams[j]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
                 videos[i]->videoStream = videos[i]->formatContext->streams[j];
                 AVCodec *codec = avcodec_find_decoder(videos[i]->videoStream->codecpar->codec_id);
                 videos[i]->videoCodecContext = avcodec_alloc_context3(codec);
-                avcodec_parameters_to_context(videos[i]->videoCodecContext,
-                                              videos[i]->videoStream->codecpar);
+                avcodec_parameters_to_context(videos[i]->videoCodecContext, videos[i]->videoStream->codecpar);
                 avcodec_open2(videos[i]->videoCodecContext, codec, nullptr);
-            } else if (videos[i]->formatContext->streams[j]->codecpar->codec_type ==
-                       AVMEDIA_TYPE_AUDIO) {
+            } else if (videos[i]->formatContext->streams[j]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
                 videos[i]->audioStream = videos[i]->formatContext->streams[j];
                 AVCodec *codec = avcodec_find_decoder(videos[i]->audioStream->codecpar->codec_id);
                 videos[i]->audioCodecContext = avcodec_alloc_context3(codec);
-                avcodec_parameters_to_context(videos[i]->audioCodecContext,
-                                              videos[i]->audioStream->codecpar);
+                avcodec_parameters_to_context(videos[i]->audioCodecContext, videos[i]->audioStream->codecpar);
                 avcodec_open2(videos[i]->audioCodecContext, codec, nullptr);
             }
             if (videos[i]->videoStream && videos[i]->audioStream) break;
         }
+        if (videos[i]->formatContext->iformat->name) {
 
-        LOGD(TAG, "loop4: %s\n", input_filenames[i]);
+        }
         videos[i]->isTsVideo = strcmp(videos[i]->formatContext->iformat->name, "mpegts") == 0;
 
-        LOGD(TAG, "\n"
-                  "%s:\t%s/%s -> %s\n\n",
+        LOGD(TAG, "\n%s:\t%s/%s -> %s\n\n",
              videos[i]->isTsVideo ? "TS" : "--",
              videos[i]->videoStream ? "Video" : "--",
              videos[i]->audioStream ? "Audio" : "--",
              input_filenames[i]);
     }
 
-    LOGD(TAG, "debug1");
-
     // create output AVFormatContext
-    ret = avformat_alloc_output_context2(&outFmtContext, nullptr, "mpegts", output_filename);
+    ret = avformat_alloc_output_context2(&outFmtContext, nullptr, nullptr, output_filename);
     if (ret < 0) {
-        LOGE(TAG, "output format error: %s\n", av_err2str(ret));
+        LOGE(TAG, "");
         return -1;
     }
-    LOGD(TAG, "debug2");
 
     // Copy codec from input video AVStream
     outVideoCodec = avcodec_find_encoder(videos[0]->videoStream->codecpar->codec_id);
     outAudioCodec = avcodec_find_encoder(videos[0]->audioStream->codecpar->codec_id);
-    LOGD(TAG, "debug3");
 
     // create output Video AVStream
     outVideoStream = avformat_new_stream(outFmtContext, outVideoCodec);
-    if (ret < 0) {
-        LOGE(TAG, "create video stream error: %s\n", av_err2str(ret));
+    if (!outVideoStream) {
+        LOGE(TAG, "unable to create output video stream: %s\n", av_err2str(ret));
         return -1;
     }
-    outVideoStream->id = 0;
-    LOGD(TAG, "debug4");
+    outVideoStream->id = outFmtContext->nb_streams - 1;
 
     outAudioStream = avformat_new_stream(outFmtContext, outAudioCodec);
-    if (ret < 0) {
-        LOGE(TAG, "create audio stream error: %s\n", av_err2str(ret));
+    if (!outAudioStream) {
+        LOGE(TAG, "unable to create output audio stream: %s\n", av_err2str(ret));
         return -1;
     }
-    outAudioStream->id = 1;
-    LOGD(TAG, "debug5");
+    outAudioStream->id = outFmtContext->nb_streams - 1;
 
-    Video *baseVideo = videos[0]; // the result code is based on this video
+    Video *baseVideo = videos[0]; // the output video format is based on the first input video
 
     // Copy Video Stream Configure from base Video
     outVideoContext = avcodec_alloc_context3(outVideoCodec);
@@ -340,17 +338,21 @@ int concat_add_title(JNIEnv *env, const char *output_filename,
         av_dict_set(&opt, "preset", "fast", 0);
         av_dict_set(&opt, "tune", "zerolatency", 0);
     }
+    if (outFmtContext->oformat->flags & AVFMT_GLOBALHEADER)
+        outVideoContext->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
     ret = avcodec_open2(outVideoContext, outVideoCodec, &opt);
     if (ret < 0) {
-        LOGE(TAG, "open output video AVCodecContext error: %s\n", av_err2str(ret));
+        LOGE(TAG, "unable to create output video codec context: %s\n", av_err2str(ret));
         return -1;
     }
     ret = avcodec_parameters_from_context(outVideoStream->codecpar, outVideoContext);
     if (ret < 0) {
-        LOGE(TAG, "copy output video parameter error: %s\n", av_err2str(ret));
+        LOGE(TAG, "unable to copy parameter to output video stream: %s\n", av_err2str(ret));
         return -1;
     }
-    LOGD(TAG, "debug6");
+    ret = av_dict_copy(&outVideoStream->metadata, baseVideo->videoStream->metadata, 0);
+    if (ret < 0) LOGW(TAG, "failed copy metadata: %s\n", av_err2str(ret));
+
 
     // Copy Audio Stream Configure from base Video
     outAudioContext = avcodec_alloc_context3(outAudioCodec);
@@ -366,17 +368,19 @@ int concat_add_title(JNIEnv *env, const char *output_filename,
     outAudioStream->time_base = outAudioContext->time_base;
     av_dict_free(&opt);
     opt = nullptr;
-//    if (outVideoContext->codec_id == AV_CODEC_ID_AAC) {
-//        av_dict_set(&opt, "profile", "23", 0);
-//    }
+    if (outVideoContext->codec_id == AV_CODEC_ID_AAC) {
+        av_dict_set(&opt, "profile", "23", 0);
+    }
+    if (outFmtContext->oformat->flags & AVFMT_GLOBALHEADER)
+        outAudioContext->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
     ret = avcodec_open2(outAudioContext, outAudioCodec, &opt);
     if (ret < 0) {
-        LOGE(TAG, "open output audio AVCodecContext error: %s\n", av_err2str(ret));
+        LOGE(TAG, "unable to create output audio codec context: %s\n", av_err2str(ret));
         return -1;
     }
     ret = avcodec_parameters_from_context(outAudioStream->codecpar, outAudioContext);
     if (ret < 0) {
-        LOGE(TAG, "copy output audio parameter error: %s\n", av_err2str(ret));
+        LOGE(TAG, "unable to copy parameter to output audio stream: %s\n", av_err2str(ret));
         return -1;
     }
 
@@ -388,28 +392,23 @@ int concat_add_title(JNIEnv *env, const char *output_filename,
             return -1;
         }
     }
-    LOGD(TAG, "debug7");
 
     ret = avformat_write_header(outFmtContext, nullptr);
     if (ret < 0) {
-        LOGE(TAG, "write header error: %s\n", av_err2str(ret));
+        LOGE(TAG, "unable to write output file header: %s\n", av_err2str(ret));
         return -1;
     }
 
-    LOGD(TAG, "debug8");
-
     av_dump_format(outFmtContext, 0, output_filename, 1);
-    LOGD(TAG, "debug9");
 
     AVPacket *packet = av_packet_alloc();
     AVFrame *videoFrame = av_frame_alloc();
     AVFrame *audioFrame = av_frame_alloc();
 
-    int64_t last_video_pts = 0;
-    int64_t last_video_dts = 0;
-    int64_t last_audio_pts = 0;
-    int64_t last_audio_dts = 0;
-    LOGD(TAG, "debug10");
+    uint64_t last_video_pts = 0;
+    uint64_t last_video_dts = 0;
+    uint64_t last_audio_pts = 0;
+    uint64_t last_audio_dts = 0;
 
 
     for (int i = 0; i < nb_inputs; ++i) {
@@ -455,17 +454,17 @@ int concat_add_title(JNIEnv *env, const char *output_filename,
                  bsfContext->time_base_out.num, bsfContext->time_base_out.den);
         }
 
-        int64_t first_video_pts = 0;
-        int64_t first_video_dts = 0;
-        int64_t first_audio_pts = 0;
-        int64_t first_audio_dts = 0;
+        uint64_t first_video_pts = 0;
+        uint64_t first_video_dts = 0;
+        uint64_t first_audio_pts = 0;
+        uint64_t first_audio_dts = 0;
         int video_ts_set = 0;
         int audio_ts_set = 0;
 
-        int64_t next_video_pts = 0;
-        int64_t next_video_dts = 0;
-        int64_t next_audio_pts = 0;
-        int64_t next_audio_dts = 0;
+        uint64_t next_video_pts = 0;
+        uint64_t next_video_dts = 0;
+        uint64_t next_audio_pts = 0;
+        uint64_t next_audio_dts = 0;
 
 
         // use first frame to make a title
@@ -503,21 +502,18 @@ int concat_add_title(JNIEnv *env, const char *output_filename,
             audioFrame->sample_rate = outAudioContext->sample_rate;
         }
 
-        logFrame(videoFrame, "First", 1);
-        logFrame(audioFrame, "First", 1);
+        ret = encode_title(env, titles[i], outFmtContext, audioFrame, videoFrame, outAudioContext, outVideoContext,
+                     outAudioStream, outVideoStream, last_audio_pts, last_audio_dts, last_video_pts, last_video_dts);
 
-        encode_title(env, titles[i], font_size, outFmtContext, audioFrame, videoFrame,
-                     outAudioContext,
-                     outVideoContext,
-                     outAudioStream, outVideoStream, last_audio_pts, last_audio_dts, last_video_pts,
-                     last_video_dts);
-
+        if (ret < 0) {
+            LOGE(TAG, "encode title failed for file: %s\n", input_filenames[i]);
+            return -1;
+        }
 
         av_seek_frame(inFormatContext, inAudioStream->index, 0, 0);
         av_seek_frame(inFormatContext, inVideoStream->index, 0, 0);
 
-        LOGD(TAG, "\nlast timestamp: A(%lld/%lld) V(%lld/%lld)\n\n", last_audio_pts, last_audio_dts,
-             last_video_pts,
+        LOGD(TAG, "\nlast timestamp: A(%lld/%lld) V(%lld/%lld)\n\n", last_audio_pts, last_audio_dts, last_video_pts,
              last_video_dts);
 
         // copy the video file
@@ -541,12 +537,9 @@ int concat_add_title(JNIEnv *env, const char *output_filename,
                 if (!videos[i]->isTsVideo) {
                     AVPacket *annexPacket = av_packet_alloc();
                     ret = av_bsf_send_packet(bsfContext, packet);
-                    if (ret < 0)
-                        LOGW(TAG, "unable to convert packet to annexb: %s\n", av_err2str(ret));
+                    if (ret < 0) LOGW(TAG, "unable to convert packet to annexb: %s\n", av_err2str(ret));
                     ret = av_bsf_receive_packet(bsfContext, annexPacket);
-                    if (ret != 0)
-                        LOGW(TAG, "unable to receive converted annexb packet: %s\n",
-                             av_err2str(ret));
+                    if (ret != 0) LOGW(TAG, "unable to receive converted annexb packet: %s\n", av_err2str(ret));
 //                    LOGI(TAG, "\t mp4 to annexb\n");
                     if (!video_ts_set) {
                         first_video_pts = annexPacket->pts;
@@ -557,14 +550,24 @@ int concat_add_title(JNIEnv *env, const char *output_filename,
 
                     annexPacket->pts -= first_video_pts;
                     annexPacket->dts -= first_video_dts;
-                    av_packet_rescale_ts(annexPacket, bsfContext->time_base_out,
-                                         outVideoStream->time_base);
+//                    av_packet_rescale_ts(annexPacket, bsfContext->time_base_out, outVideoStream->time_base);
+                    annexPacket->pts = av_rescale_q_rnd(annexPacket->pts, bsfContext->time_base_out,
+                                                        outVideoStream->time_base,
+                                                        (AVRounding) (AV_ROUND_INF | AV_ROUND_PASS_MINMAX));
+                    annexPacket->dts = av_rescale_q_rnd(annexPacket->dts, bsfContext->time_base_out,
+                                                        outVideoStream->time_base,
+                                                        (AVRounding) (AV_ROUND_INF | AV_ROUND_PASS_MINMAX));
+                    annexPacket->duration = av_rescale_q(annexPacket->duration, bsfContext->time_base_out,
+                                                         outVideoStream->time_base);
+                    annexPacket->pos = -1;
                     annexPacket->pts += last_video_pts;
                     annexPacket->dts += last_video_dts;
                     next_video_pts = annexPacket->pts + annexPacket->duration;
                     next_video_dts = annexPacket->dts + annexPacket->duration;
 
-//                    logPacket(annexPacket, "V");
+#ifdef DEBUG
+                    logPacket(annexPacket, &outVideoStream->time_base, "V");
+#endif
                     av_interleaved_write_frame(outFmtContext, annexPacket);
                     av_packet_free(&annexPacket);
                 } else {
@@ -578,14 +581,20 @@ int concat_add_title(JNIEnv *env, const char *output_filename,
 
                     packet->pts -= first_video_pts;
                     packet->dts -= first_video_dts;
-                    av_packet_rescale_ts(packet, inVideoStream->time_base,
-                                         outVideoStream->time_base);
+//                    av_packet_rescale_ts(packet, inVideoStream->time_base, outVideoStream->time_base);
+                    packet->pts = av_rescale_q_rnd(packet->pts, inVideoStream->time_base, outVideoStream->time_base,
+                                                   (AVRounding) (AV_ROUND_INF | AV_ROUND_PASS_MINMAX));
+                    packet->dts = av_rescale_q_rnd(packet->dts, inVideoStream->time_base, outVideoStream->time_base,
+                                                   (AVRounding) (AV_ROUND_INF | AV_ROUND_PASS_MINMAX));
+                    packet->duration = av_rescale_q(packet->duration, inVideoStream->time_base,
+                                                    outVideoStream->time_base);
+                    packet->pos = -1;
                     packet->pts += last_video_pts;
                     packet->dts += last_video_dts;
                     next_video_pts = packet->pts + packet->duration;
                     next_video_dts = packet->dts + packet->duration;
 
-//                    logPacket(packet, "V");
+                    logPacket(packet, &outVideoStream->time_base, "V");
 
                     av_interleaved_write_frame(outFmtContext, packet);
                 }
@@ -606,7 +615,9 @@ int concat_add_title(JNIEnv *env, const char *output_filename,
                 packet->dts += last_audio_dts;
                 next_audio_pts = packet->pts + packet->duration;
                 next_audio_dts = packet->dts + packet->duration;
-//                logPacket(packet, "A");
+#ifdef DEBUG
+                logPacket(packet, &outAudioStream->time_base, "A");
+#endif
                 av_interleaved_write_frame(outFmtContext, packet);
             }
         } while (true);
@@ -617,8 +628,7 @@ int concat_add_title(JNIEnv *env, const char *output_filename,
 
         if (!videos[i]->isTsVideo) av_bsf_free(&bsfContext);
 
-        LOGD(TAG,
-             "--------------------------------------------------------------------------------\n");
+        LOGD(TAG, "--------------------------------------------------------------------------------\n");
     }
 
 

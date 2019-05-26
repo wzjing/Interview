@@ -1,26 +1,34 @@
+
 #include "log.h"
 
+#ifndef TAG
 #define TAG "--"
+#endif
 
-void logPacket(AVPacket *packet, const char *tag) {
+void logPacket(AVPacket *packet, AVRational *timebase, const char *tag) {
     char flags[3];
     flags[0] = packet->flags & AV_PKT_FLAG_KEY ? 'K' : '-';
     flags[1] = packet->flags & AV_PKT_FLAG_DISCARD ? 'D' : '-';
-    char tag_str[20];
-    snprintf(tag_str, 20, "[\033[33m%s\033[0m]", tag);
-    LOGD(TAG, "Packet%-16s->\tstream: %d\tPTS: %8ld\tDTS: %8ld\tDuration: %8ld\tflags:\033[34m%-8s\033[0m\tsize:%8d\tside_data: %s(%d)\n",
+    flags[2] = '\0';
+    char tag_str[24];
+    snprintf(tag_str, 24, "[\033[33m%s\033[0m]", tag);
+    LOGD(TAG,
+         "Packet%-16.16s->\tstream: %d\tPTS: %8lld|%-8.8s\tDTS: %8lld|%-8.8s\tDuration: %8lld|%-8.8s\tflags:\033[34m%-8s\033[0m\tsize:%8d\tside_data: %s(%d)\n",
          tag_str,
          packet->stream_index,
          packet->pts,
+         av_ts2timestr(packet->pts, timebase),
          packet->dts,
+         av_ts2timestr(packet->dts, timebase),
          packet->duration,
+         av_ts2timestr(packet->duration, timebase),
          flags,
          packet->size,
          packet->side_data ? av_packet_side_data_name(packet->side_data->type) : "none",
          packet->side_data ? packet->side_data->size : 0);
 }
 
-void logFrame(AVFrame *frame, const char *tag, int isVideo) {
+void logFrame(AVFrame *frame, AVRational *timebase, const char *tag, int isVideo) {
     char tag_str[20];
     snprintf(tag_str, 20, "[\033[33m%s\033[0m]", tag);
     if (isVideo) {
@@ -39,25 +47,32 @@ void logFrame(AVFrame *frame, const char *tag, int isVideo) {
                 type = "\033[33m-\033[0m";
                 break;
         }
-        LOGD(TAG, "VFrame%-16s->\ttype: video\tPTS: %8lld\tDTS: %8lld\tDuration: %8lld\tpict: %-16s\tfmt:%s\tsize: %dx%d\n",
+        LOGD(TAG,
+             "VFrame%-16.16s->\ttype: video\tPTS: %8lld|%-8.8s\tDTS: %8lld|%-8.8s\tDuration: %8lld|%-8.8s\tfmt:%s\tpict: %-16s\tsize: %dx%d\n",
              tag_str,
              frame->pts,
+             av_ts2timestr(frame->pts, timebase),
              frame->pkt_dts,
+             av_ts2timestr(frame->pkt_dts, timebase),
              frame->pkt_duration,
+             av_ts2timestr(frame->pkt_duration, timebase),
+             av_get_pix_fmt_name((AVPixelFormat) frame->format),
              type,
-             av_get_pix_fmt_name((AVPixelFormat)frame->format),
              frame->width,
              frame->height);
     } else {
-        LOGD(TAG, "AFrame%-16s->\ttype: audio\tPTS: %8lld\tDTS: %8lld\trate: %d\tchannels: %d\tfmt: %s\tsize: %d|%d\n",
+        LOGD(TAG,
+             "AFrame%-16s->\ttype: audio\tPTS: %8lld|%-8.8s\tDTS: %8lld|%-8.8s\tDuration: %8lld|%-8.8s\tfmt: %s\tchannels: %d\trate: %d\n",
              tag_str,
              frame->pts,
+             av_ts2timestr(frame->pts, timebase),
              frame->pkt_dts,
-             frame->sample_rate,
+             av_ts2timestr(frame->pkt_dts, timebase),
+             frame->pkt_duration,
+             av_ts2timestr(frame->pkt_duration, timebase),
+             av_get_sample_fmt_name((AVSampleFormat) frame->format),
              frame->channels,
-             av_get_sample_fmt_name((AVSampleFormat)frame->format),
-             frame->linesize[0],
-             frame->linesize[1]);
+             frame->sample_rate);
     }
 }
 
@@ -156,5 +171,5 @@ void logMetadata(AVDictionary *metadata, const char *tag) {
     AVDictionaryEntry *item = nullptr;
     while ((item = av_dict_get(metadata, "", item, AV_DICT_IGNORE_SUFFIX)))
         printf("\t%s:\t%s\n", item->key, item->value);
-    LOGD(TAG, "\n");
+    LOGD(TAG, "----\n");
 }

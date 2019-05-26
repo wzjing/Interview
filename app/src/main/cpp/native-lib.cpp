@@ -1,13 +1,12 @@
 #include <jni.h>
-#include "utils/log.h"
-#include "concat/concat_add_title.h"
-#include "bgm/mix_bgm.h"
-#include "remux/remux.h"
 #include <cstring>
+#include <regex>
+#include "mediautil/bgm.h"
+#include "mediautil/concat.h"
+#include "mediautil/log.h"
 
 #define TAG "native-lib"
 
-#include <regex>
 
 
 extern "C"
@@ -46,23 +45,23 @@ Java_com_wzjing_interview_VideoEditor_nativeMuxVideos(JNIEnv *env, jobject insta
          titles_arr, inputNum, fontSize, duration);
 
 
-    std::string cache_filename;
+//    std::string cache_filename;
+//
+//    cache_filename = std::regex_replace(output_filename, std::regex(".[0-9a-zA-Z]+$"), "_cache.ts");
+//
+//    LOGD(TAG, "cache file: %s\n", cache_filename.c_str());
+//
+//
+////    char cache_filename[128];
+////    snprintf(cache_filename, sizeof(cache_filename), "%s.ts", output_filename);
 
-    cache_filename = std::regex_replace(output_filename, std::regex(".[0-9a-zA-Z]+$"), "_cache.ts");
-
-    LOGD(TAG, "cache file: %s\n", cache_filename.c_str());
-
-
-//    char cache_filename[128];
-//    snprintf(cache_filename, sizeof(cache_filename), "%s.ts", output_filename);
-
-    int ret = concat_add_title(env, cache_filename.c_str(), input_filenames, titles_, inputNum,
+    int ret = concat_add_title(env, output_filename, input_filenames, titles_, inputNum,
                                fontSize,
                                duration);
 
-    if (ret == 0) {
-        ret = remux(cache_filename.c_str(), output_filename);
-    }
+//    if (ret == 0) {
+//        ret = remux(cache_filename.c_str(), output_filename);
+//    }
 
 
     for (int i = 0; i < inputNum; ++i) {
@@ -90,7 +89,7 @@ Java_com_wzjing_interview_VideoEditor_nativeAddBGM(JNIEnv *env, jobject instance
     const char *input_filename = env->GetStringUTFChars(inputFilename, JNI_FALSE);
     const char *bgm_filename = env->GetStringUTFChars(bgmFilename, JNI_FALSE);
 
-    int ret = mix_bgm(output_filename, input_filename, bgm_filename, relativeBGMVolume);
+    int ret = add_bgm(output_filename, input_filename, bgm_filename, relativeBGMVolume);
 
     env->ReleaseStringUTFChars(outputFilename, output_filename);
     env->ReleaseStringUTFChars(inputFilename, input_filename);

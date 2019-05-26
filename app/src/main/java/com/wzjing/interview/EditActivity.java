@@ -4,6 +4,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
 import android.support.v7.app.AppCompatActivity;
+import android.util.Log;
 
 import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.ExoPlayerFactory;
@@ -36,10 +37,14 @@ public class EditActivity extends AppCompatActivity {
         player = ExoPlayerFactory.newSimpleInstance(this);
         playerView.setPlayer(player);
 
-        new Thread(()->{
+        new Thread(() -> {
             String uri = testMux();
-            runOnUiThread(()->{
-                playVideo(uri);
+            runOnUiThread(() -> {
+                if (uri != null) {
+                    playVideo(uri);
+                } else {
+                    Log.e(TAG, "unable to mux video");
+                }
             });
         }).start();
 
@@ -64,12 +69,11 @@ public class EditActivity extends AppCompatActivity {
         File video0 = new File(Environment.getExternalStorageDirectory(), "Download/video0.mp4");
         File video1 = new File(Environment.getExternalStorageDirectory(), "Download/video1.mp4");
         VideoEditor editor = new VideoEditor();
-        String uri = Environment.getExternalStorageDirectory() + File.separator + "mux.ts";
+        String uri = Environment.getExternalStorageDirectory() + File.separator + "mux.mp4";
         HashMap<String, File> map = new HashMap<>();
         map.put("Question: how old are you", video0);
         map.put("Question: what is your skill", video1);
-        editor.muxVideos(uri, map, 30, 1);
-        return uri;
+        return editor.muxVideos(uri, map, 30, 1) ? uri : null;
     }
 
     private String testBGM() {

@@ -1,7 +1,7 @@
 #include "video_filter.h"
-#include "../utils/log.h"
+#include "log.h"
 
-#define TAG "VideoFilter"
+#define TAG "video_filter"
 
 int VideoFilter::create(const char *filter_descr, VideoConfig *inConfig, VideoConfig *outConfig) {
     this->description = filter_descr;

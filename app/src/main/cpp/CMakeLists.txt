@@ -3,21 +3,18 @@ cmake_minimum_required(VERSION 3.10)
 add_definitions(-DDEBUG)
 
 add_library(native-lib SHARED
-        bgm/mix_bgm.h
-        bgm/mix_bgm.cpp
-        concat/concat_add_title.h
-        concat/concat_add_title.cpp
-        filters/audio_filter.h
-        filters/audio_filter.cpp
-        filters/video_filter.h
-        filters/video_filter.cpp
-        remux/remux.h
-        remux/remux.cpp
-        utils/log.h
-        utils/log.cpp
-        utils/bitmap_utils.h
-        utils/bitmap_utils.cpp
-        utils/error.h
+        mediautil/bgm.h
+        mediautil/bgm.cpp
+        mediautil/concat.h
+        mediautil/concat.cpp
+        mediautil/audio_filter.h
+        mediautil/audio_filter.cpp
+        mediautil/video_filter.h
+        mediautil/video_filter.cpp
+        mediautil/bitmap_utils.h
+        mediautil/bitmap_utils.cpp
+        mediautil/log.h
+        mediautil/log.cpp
         native-lib.cpp
         )
 

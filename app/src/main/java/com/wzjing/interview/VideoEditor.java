@@ -13,7 +13,6 @@ public class VideoEditor {
 
     static {
         System.loadLibrary("native-lib");
-        System.loadLibrary("utils");
         System.loadLibrary("avcodec");
         System.loadLibrary("avformat");
         System.loadLibrary("avutil");
