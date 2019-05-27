@@ -38,7 +38,7 @@ public class EditActivity extends AppCompatActivity {
 //        player = ExoPlayerFactory.newSimpleInstance(this);
 //        playerView.setPlayer(player);
 
-        new Thread(() -> {
+        Thread videoThread = new Thread(() -> {
             String uri = testMux();
             runOnUiThread(() -> {
                 if (uri != null) {
@@ -48,7 +48,9 @@ public class EditActivity extends AppCompatActivity {
                     Log.e(TAG, "unable to mux video");
                 }
             });
-        }).start();
+        });
+        videoThread.setName("VideoThread");
+        videoThread.start();
 
     }
 
@@ -76,7 +78,7 @@ public class EditActivity extends AppCompatActivity {
         HashMap<String, File> map = new HashMap<>();
         map.put("Question: how old are you", video0);
         map.put("Question: what is your skill", video1);
-        return editor.muxVideos(uri, map, 30, 1) ? uri : null;
+        return editor.muxVideos(uri, map, 30, 2) ? uri : null;
     }
 
     private String testBGM() {

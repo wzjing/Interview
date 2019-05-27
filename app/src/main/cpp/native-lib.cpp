@@ -64,10 +64,10 @@ Java_com_wzjing_interview_VideoEditor_nativeMuxVideos(JNIEnv *env, jobject insta
 //    }
 
 
-    for (int i = 0; i < inputNum; ++i) {
-        auto jstr = (jstring) env->GetObjectArrayElement(titles, i);
-        env->ReleaseStringUTFChars(jstr, titles_[i]);
-    }
+//    for (int i = 0; i < inputNum; ++i) {
+//        auto jstr = (jstring) env->GetObjectArrayElement(titles, i);
+//        env->ReleaseStringUTFChars(jstr, titles_[i]);
+//    }
     free(input_filenames);
     for (int i = 0; i < inputNum; ++i) {
         auto jstr = (jstring) env->GetObjectArrayElement(inputFilenames, i);

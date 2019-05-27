@@ -17,7 +17,6 @@ struct Video {
     AVCodecContext *audioCodecContext = nullptr;
     AVCodecContext *videoCodecContext = nullptr;
     int isTsVideo = 0;
-
 };
 
 #define TAG "concat"
@@ -690,7 +689,11 @@ int write_packet(AVFormatContext *formatContext, AVStream *stream, AVRational ti
     av_packet_rescale_ts(packet, timebase, stream->time_base);
     packet->stream_index = stream->index;
 
-    logPacket(packet, &stream->time_base, "encode");
+    if (stream->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
+//        logPacket(packet, &stream->time_base, "AUDIO");
+    } else if (stream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
+        logPacket(packet, &stream->time_base, "VIDEO");
+    }
 
     return av_interleaved_write_frame(formatContext, packet);
 }
@@ -888,8 +891,6 @@ int concat_encode(JNIEnv *env, const char *output_filename, const char **input_f
 
     av_dump_format(outFmtContext, 0, output_filename, 1);
 
-    AVPacket *inPacket = av_packet_alloc();
-    AVPacket *outPacket = av_packet_alloc();
     AVFrame *inVideoFrame = av_frame_alloc();
     AVFrame *outVideoFrame = av_frame_alloc();
     AVFrame *inAudioFrame = av_frame_alloc();
@@ -897,7 +898,6 @@ int concat_encode(JNIEnv *env, const char *output_filename, const char **input_f
 
     int video_pts = 0;
     int audio_pts = 1;
-
 
     for (int i = 0; i < nb_inputs; ++i) {
         AVFormatContext *inFormatContext = videos[i]->formatContext;
@@ -907,21 +907,22 @@ int concat_encode(JNIEnv *env, const char *output_filename, const char **input_f
         AVCodecContext *audioContext = videos[i]->audioCodecContext;
         AVCodecContext *videoContext = videos[i]->videoCodecContext;
 
-
         // use first frame to make a title
         int got_video = 0;
         int got_audio = 0;
         do {
-            ret = av_read_frame(inFormatContext, inPacket);
+            AVPacket pkt;
+            av_init_packet(&pkt);
+            ret = av_read_frame(inFormatContext, &pkt);
             if (ret < 0) break;
-            if (!got_video && inPacket->stream_index == inVideoStream->index) {
-                ret = avcodec_send_packet(videoContext, inPacket);
+            if (!got_video && pkt.stream_index == inVideoStream->index) {
+                ret = avcodec_send_packet(videoContext, &pkt);
                 if (ret < 0) continue;
                 ret = avcodec_receive_frame(videoContext, inVideoFrame);
                 if (ret < 0) continue;
                 else got_video = 1;
-            } else if (!got_audio && inPacket->stream_index == inAudioStream->index) {
-                ret = avcodec_send_packet(audioContext, inPacket);
+            } else if (!got_audio && pkt.stream_index == inAudioStream->index) {
+                ret = avcodec_send_packet(audioContext, &pkt);
                 if (ret < 0) continue;
                 ret = avcodec_receive_frame(audioContext, inAudioFrame);
                 if (ret < 0) continue;
@@ -1005,18 +1006,20 @@ int concat_encode(JNIEnv *env, const char *output_filename, const char **input_f
                     encode_video = 0;
                 } else {
                     ret = av_frame_copy(outVideoFrame, inVideoFrame);
-                    if (ret < 0) LOGW(TAG, "\tget copy video frame failed\n");
+                    if (ret < 0) LOGW(TAG, "\tcopy video frame failed: %s\n", av_err2str(ret));
                     ret = av_frame_copy_props(outVideoFrame, inVideoFrame);
-                    if (ret < 0) LOGW(TAG, "\tget copy video frame props failed\n");
+                    if (ret < 0)
+                        LOGW(TAG, "\tcopy video frame props failed: %s\n", av_err2str(ret));
                     outVideoFrame->pts = video_pts++;
                     avcodec_send_frame(outVideoContext, outVideoFrame);
                 }
-                av_frame_unref(outVideoFrame);
                 do {
-                    ret = avcodec_receive_packet(outVideoContext, outPacket);
+                    AVPacket pkt{0};
+                    av_init_packet(&pkt);
+                    ret = avcodec_receive_packet(outVideoContext, &pkt);
                     if (ret == 0) {
                         write_packet(outFmtContext, outVideoStream, outVideoContext->time_base,
-                                     outPacket);
+                                     &pkt);
                     } else if (ret == AVERROR(EAGAIN)) {
                         break;
                     } else {
@@ -1024,27 +1027,27 @@ int concat_encode(JNIEnv *env, const char *output_filename, const char **input_f
                         return -1;
                     }
                 } while (ret == 0);
-                av_packet_unref(inPacket);
-                av_packet_unref(outPacket);
             } else {
                 if (av_compare_ts(audio_pts - last_audio_pts, audioContext->time_base,
                                   titleDuration, (AVRational) {1, 1}) >= 0) {
                     encode_audio = 0;
                 } else {
                     ret = av_frame_copy(outAudioFrame, inAudioFrame);
-                    if (ret < 0) LOGW(TAG, "\tget copy video frame failed\n");
+                    if (ret < 0) LOGW(TAG, "\tcopy audio frame failed: %s\n", av_err2str(ret));
                     ret = av_frame_copy_props(outAudioFrame, inAudioFrame);
-                    if (ret < 0) LOGW(TAG, "\tget copy video frame props failed\n");
+                    if (ret < 0)
+                        LOGW(TAG, "\tcopy audio frame props failed: %s\n", av_err2str(ret));
                     outAudioFrame->pts = audio_pts;
                     audio_pts += 1024;
                     avcodec_send_frame(outAudioContext, outAudioFrame);
                 }
-                av_frame_unref(outAudioFrame);
                 do {
-                    ret = avcodec_receive_packet(outAudioContext, outPacket);
+                    AVPacket pkt{0};
+                    av_init_packet(&pkt);
+                    ret = avcodec_receive_packet(outAudioContext, &pkt);
                     if (ret == 0) {
                         write_packet(outFmtContext, outAudioStream, outAudioContext->time_base,
-                                     outPacket);
+                                     &pkt);
                     } else if (ret == AVERROR(EAGAIN)) {
                         break;
                     } else {
@@ -1052,8 +1055,6 @@ int concat_encode(JNIEnv *env, const char *output_filename, const char **input_f
                         return -1;
                     }
                 } while (ret == 0);
-                av_packet_unref(inPacket);
-                av_packet_unref(outPacket);
             }
         }
 
@@ -1067,7 +1068,9 @@ int concat_encode(JNIEnv *env, const char *output_filename, const char **input_f
         LOGD(TAG, "Title encoded------------------------\n\n");
 
         do {
-            ret = av_read_frame(inFormatContext, inPacket);
+            AVPacket pkt{0};
+            av_init_packet(&pkt);
+            ret = av_read_frame(inFormatContext, &pkt);
             if (ret == AVERROR_EOF) {
                 LOGW(TAG, "\tread fragment end of file\n");
                 break;
@@ -1076,19 +1079,19 @@ int concat_encode(JNIEnv *env, const char *output_filename, const char **input_f
                 break;
             }
 
-            if (inPacket->pts < 0) {
+            if (pkt.pts < 0) {
                 LOGW(TAG, "\nskip negative packet\n");
                 continue;
             }
-            if (inPacket->flags & AV_PKT_FLAG_DISCARD) {
+            if (pkt.flags & AV_PKT_FLAG_DISCARD) {
                 LOGW(TAG, "\nPacket is discard\n");
                 continue;
             }
 
-            if (inPacket->stream_index == inVideoStream->index) {
+            if (pkt.stream_index == inVideoStream->index) {
 
                 // decode
-                ret = avcodec_send_packet(videoContext, inPacket);
+                ret = avcodec_send_packet(videoContext, &pkt);
                 if (ret == AVERROR_EOF || ret == AVERROR(EAGAIN)) {
                     continue;
                 } else if (ret < 0) {
@@ -1119,7 +1122,9 @@ int concat_encode(JNIEnv *env, const char *output_filename, const char **input_f
                 av_frame_unref(inVideoFrame);
                 av_frame_unref(outVideoFrame);
                 do {
-                    ret = avcodec_receive_packet(outVideoContext, outPacket);
+                    AVPacket outPkt{0};
+                    av_init_packet(&outPkt);
+                    ret = avcodec_receive_packet(outVideoContext, &outPkt);
                     if (ret == AVERROR_EOF || ret == AVERROR(EAGAIN)) {
                         break;
                     } else if (ret < 0) {
@@ -1127,17 +1132,14 @@ int concat_encode(JNIEnv *env, const char *output_filename, const char **input_f
                         return -1;
                     }
                     write_packet(outFmtContext, outVideoStream, outVideoContext->time_base,
-                                 outPacket);
+                                 &outPkt);
 
                 } while (ret == 0);
-                av_packet_unref(inPacket);
-                av_packet_unref(outPacket);
 
-
-            } else if (inPacket->stream_index == inAudioStream->index) {
+            } else if (pkt.stream_index == inAudioStream->index) {
 
                 // decode
-                ret = avcodec_send_packet(audioContext, inPacket);
+                ret = avcodec_send_packet(audioContext, &pkt);
                 if (ret == AVERROR_EOF || ret == AVERROR(EAGAIN)) {
                     continue;
                 } else if (ret < 0) {
@@ -1168,7 +1170,9 @@ int concat_encode(JNIEnv *env, const char *output_filename, const char **input_f
                 av_frame_unref(inAudioFrame);
                 av_frame_unref(outAudioFrame);
                 do {
-                    ret = avcodec_receive_packet(outAudioContext, outPacket);
+                    AVPacket outPkt{0};
+                    av_init_packet(&outPkt);
+                    ret = avcodec_receive_packet(outAudioContext, &outPkt);
                     if (ret == AVERROR_EOF || ret == AVERROR(EAGAIN)) {
                         break;
                     } else if (ret < 0) {
@@ -1177,11 +1181,9 @@ int concat_encode(JNIEnv *env, const char *output_filename, const char **input_f
                     }
 
                     write_packet(outFmtContext, outAudioStream, outAudioContext->time_base,
-                                 outPacket);
+                                 &outPkt);
 
                 } while (ret == 0);
-                av_packet_unref(inPacket);
-                av_packet_unref(outPacket);
             }
         } while (true);
 
@@ -1195,7 +1197,9 @@ int concat_encode(JNIEnv *env, const char *output_filename, const char **input_f
 
     avcodec_send_frame(outVideoContext, nullptr);
     do {
-        ret = avcodec_receive_packet(outVideoContext, outPacket);
+        AVPacket pkt{0};
+        av_init_packet(&pkt);
+        ret = avcodec_receive_packet(outVideoContext, &pkt);
         if (ret == AVERROR_EOF) {
             break;
         } else if (ret == AVERROR(EAGAIN)) {
@@ -1205,13 +1209,15 @@ int concat_encode(JNIEnv *env, const char *output_filename, const char **input_f
             return -1;
         }
 
-        write_packet(outFmtContext, outVideoStream, outVideoContext->time_base, outPacket);
+        write_packet(outFmtContext, outVideoStream, outVideoContext->time_base, &pkt);
 
     } while (ret == 0);
 
     avcodec_send_frame(outAudioContext, nullptr);
     do {
-        ret = avcodec_receive_packet(outAudioContext, outPacket);
+        AVPacket pkt{0};
+        av_init_packet(&pkt);
+        ret = avcodec_receive_packet(outAudioContext, &pkt);
         if (ret == AVERROR_EOF) {
             break;
         } else if (ret == AVERROR(EAGAIN)) {
@@ -1221,7 +1227,7 @@ int concat_encode(JNIEnv *env, const char *output_filename, const char **input_f
             return -1;
         }
 
-        write_packet(outFmtContext, outAudioStream, outAudioContext->time_base, outPacket);
+        write_packet(outFmtContext, outAudioStream, outAudioContext->time_base, &pkt);
 
     } while (ret == 0);
 
@@ -1232,15 +1238,11 @@ int concat_encode(JNIEnv *env, const char *output_filename, const char **input_f
         avio_closep(&outFmtContext->pb);
     }
 
-
-    av_packet_free(&inPacket);
-    av_packet_free(&outPacket);
     av_frame_free(&inAudioFrame);
     av_frame_free(&inVideoFrame);
     av_frame_free(&outAudioFrame);
     av_frame_free(&outVideoFrame);
     avformat_free_context(outFmtContext);
-
 
     for (int i = 0; i < nb_inputs; ++i) {
         free(videos[i]);
