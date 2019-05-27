@@ -5,6 +5,7 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
+import android.widget.Toast;
 
 import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.ExoPlayerFactory;
@@ -34,14 +35,15 @@ public class EditActivity extends AppCompatActivity {
         PlayerView playerView = findViewById(R.id.playerView);
 //        DefaultTrackSelector trackSelector = new DefaultTrackSelector();
 //        LoadControl loadControl = new DefaultLoadControl();
-        player = ExoPlayerFactory.newSimpleInstance(this);
-        playerView.setPlayer(player);
+//        player = ExoPlayerFactory.newSimpleInstance(this);
+//        playerView.setPlayer(player);
 
         new Thread(() -> {
             String uri = testMux();
             runOnUiThread(() -> {
                 if (uri != null) {
-                    playVideo(uri);
+//                    playVideo(uri);
+                    Toast.makeText(EditActivity.this, "finished: " + uri, Toast.LENGTH_SHORT).show();
                 } else {
                     Log.e(TAG, "unable to mux video");
                 }
@@ -53,7 +55,8 @@ public class EditActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        player.stop();
+//        player.stop();
+//        player.release();
     }
 
     private void playVideo(String uri) {

@@ -10,7 +10,7 @@
 
 const char *Bimap_TAG = "bitmap_utils";
 
-void drawText(JNIEnv *env, uint8_t *data, int width, int height, const char *text, int font_size) {
+void drawText(JNIEnv *env, uint8_t *data, int width, int height, const char *text, int font_size, int rotation) {
 
     jclass TextFilter = env->FindClass(JNI_CLASS("jni/TextFilter"));
     jmethodID constructor = env->GetMethodID(TextFilter, "<init>", "(II)V");
@@ -19,7 +19,6 @@ void drawText(JNIEnv *env, uint8_t *data, int width, int height, const char *tex
     jmethodID getBitmap = env->GetMethodID(TextFilter, "getBitmap", "()Landroid/graphics/Bitmap;");
     jobject bitmap = env->CallObjectMethod(textFilter, getBitmap);
 
-    AndroidBitmapInfo bitmap_info = {0};
     uint8_t *pixels = nullptr;
     size_t size = 0;
 
@@ -33,8 +32,8 @@ void drawText(JNIEnv *env, uint8_t *data, int width, int height, const char *tex
     AndroidBitmap_unlockPixels(env, bitmap);
 
     LOGD(Bimap_TAG, "native draw text");
-    jmethodID drawText = env->GetMethodID(TextFilter, "drawText", "(Ljava/lang/String;I)V");;
-    env->CallVoidMethod(textFilter, drawText, env->NewStringUTF(text), font_size);
+    jmethodID drawText = env->GetMethodID(TextFilter, "drawText", "(Ljava/lang/String;II)V");;
+    env->CallVoidMethod(textFilter, drawText, env->NewStringUTF(text), font_size, rotation);
 
     LOGD(Bimap_TAG, "native get result bitmap");
     AndroidBitmap_lockPixels(env, bitmap, (void **) &pixels);
@@ -45,4 +44,5 @@ void drawText(JNIEnv *env, uint8_t *data, int width, int height, const char *tex
     LOGD(Bimap_TAG, "native free bitmap");
     jmethodID free = env->GetMethodID(TextFilter, "free", "()V");;
     env->CallVoidMethod(textFilter, free);
+    textFilter = nullptr;
 }

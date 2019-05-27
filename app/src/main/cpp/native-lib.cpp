@@ -50,12 +50,12 @@ Java_com_wzjing_interview_VideoEditor_nativeMuxVideos(JNIEnv *env, jobject insta
 //    cache_filename = std::regex_replace(output_filename, std::regex(".[0-9a-zA-Z]+$"), "_cache.ts");
 //
 //    LOGD(TAG, "cache file: %s\n", cache_filename.c_str());
-//
-//
-////    char cache_filename[128];
-////    snprintf(cache_filename, sizeof(cache_filename), "%s.ts", output_filename);
 
-    int ret = concat_add_title(env, output_filename, input_filenames, titles_, inputNum,
+
+//    char cache_filename[128];
+//    snprintf(cache_filename, sizeof(cache_filename), "%s.ts", output_filename);
+
+    int ret = concat_encode(env, output_filename, input_filenames, titles_, inputNum,
                                fontSize,
                                duration);
 

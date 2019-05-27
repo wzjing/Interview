@@ -8,7 +8,7 @@
 #include <android/bitmap.h>
 #include <jni.h>
 
-void drawText(JNIEnv* env, uint8_t *data, int width, int height, const char *text, int font_size);
+void drawText(JNIEnv* env, uint8_t *data, int width, int height, const char *text, int font_size, int rotation);
 
 
 #endif //INTERVIEW_BITMAP_UTILS_H
