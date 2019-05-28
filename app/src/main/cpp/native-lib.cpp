@@ -89,6 +89,8 @@ Java_com_wzjing_interview_VideoEditor_nativeAddBGM(JNIEnv *env, jobject instance
     const char *input_filename = env->GetStringUTFChars(inputFilename, JNI_FALSE);
     const char *bgm_filename = env->GetStringUTFChars(bgmFilename, JNI_FALSE);
 
+    LOGD(TAG, "nativeAddBGM(%s, %s, %s, %f)\n", output_filename, input_filename, bgm_filename, relativeBGMVolume);
+
     int ret = add_bgm(output_filename, input_filename, bgm_filename, relativeBGMVolume);
 
     env->ReleaseStringUTFChars(outputFilename, output_filename);

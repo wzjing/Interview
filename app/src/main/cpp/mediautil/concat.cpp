@@ -50,10 +50,10 @@ int encode_title(JNIEnv *env, const char *title, AVFormatContext *formatContext,
     int64_t video_frame_pts = 0;
     int64_t audio_frame_pts = 0;
 
-    uint64_t next_video_pts = 0;
-    uint64_t next_video_dts = 0;
-    uint64_t next_audio_pts = 0;
-    uint64_t next_audio_dts = 0;
+    int64_t next_video_pts = 0;
+    int64_t next_video_dts = 0;
+    int64_t next_audio_pts = 0;
+    int64_t next_audio_dts = 0;
 
     int sample_size = 0;
 

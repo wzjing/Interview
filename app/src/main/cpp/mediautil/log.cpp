@@ -145,11 +145,14 @@ void logContext(AVCodecContext *context, const char *tag, int isVideo) {
              context->flags & AV_CODEC_FLAG_GLOBAL_HEADER ? "YES" : "NO"
         );
     } else {
+        char* ch_layout = new char[128];
+        av_get_channel_layout_string(ch_layout, 128, av_get_channel_layout_nb_channels(context->channel_layout), context->channel_layout);
         LOGD(TAG, "\n\033[34mAudio Context\033[0m(\033[33m%s\033[0m):\n"
                   "\tcodec: %s\n"
                   "\tsample:%s\n"
                   "\tsample_rate: %d\n"
                   "\tbitrate:  %lld\n"
+                  "\tch_layout:  %s\n"
                   "\ttimebase: {%d, %d}\n"
                   "\textradata_size: %d\n"
                   "\tglobal_header: %s\n\n",
@@ -158,11 +161,13 @@ void logContext(AVCodecContext *context, const char *tag, int isVideo) {
              av_get_sample_fmt_name(context->sample_fmt),
              context->sample_rate,
              context->bit_rate,
+             ch_layout,
              context->time_base.num,
              context->time_base.den,
              context->extradata_size,
              context->flags & AV_CODEC_FLAG_GLOBAL_HEADER ? "YES" : "NO"
         );
+        delete [] ch_layout;
     }
 }
 

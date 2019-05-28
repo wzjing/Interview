@@ -153,8 +153,8 @@ int add_bgm(const char *output_filename, const char *input_filename, const char 
     outAudioContext->sample_rate = inAudioContext->sample_rate;
     outAudioContext->bit_rate = inAudioContext->bit_rate;
     outAudioContext->channel_layout = inAudioContext->channel_layout;
-    outAudioContext->channels = inAudioContext->channels;
     outAudioContext->time_base = (AVRational) {1, outAudioContext->sample_rate};
+    outAudioContext->flags|=AV_CODEC_FLAG_LOW_DELAY;
     outAudioStream->time_base = outAudioContext->time_base;
     if (outFmtContext->oformat->flags & AVFMT_GLOBALHEADER) {
         outAudioContext->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
@@ -191,13 +191,13 @@ int add_bgm(const char *output_filename, const char *input_filename, const char 
     }
 
 #ifdef DEBUG
-    logContext(inVideoContext, "input", 1);
-    logMetadata(outVideoStream->metadata, "Video-Stream");
+    logContext(inAudioContext, "input", 0);
+    logContext(bgmAudioContext, "bgm", 0);
+    logContext(outAudioContext, "out", 0);
 #endif
 
     AVPacket *packet = av_packet_alloc();
     AVPacket *bgmPacket = av_packet_alloc();
-    AVPacket *mixPacket = av_packet_alloc();
     AVFrame *inputFrame = av_frame_alloc();
     AVFrame *bgmFrame = av_frame_alloc();
 
@@ -219,6 +219,9 @@ int add_bgm(const char *output_filename, const char *input_filename, const char 
              "[in2]volume=volume=%f[out2];[in1][out2]amix[out]",
              bgm_volume);
     filter.create(filter_description, &config1, &config2, &configOut);
+    filter.dumpGraph();
+
+    FILE *mix = fopen("/storage/emulated/0/mix.pcm", "wb");
 
     do {
         ret = av_read_frame(inFmtContext, packet);
@@ -238,7 +241,7 @@ int add_bgm(const char *output_filename, const char *input_filename, const char 
                                             outVideoStream->time_base);
             packet->pos = -1;
 #ifdef DEBUG
-            logPacket(packet, &outVideoStream->time_base, "V");
+//            logPacket(packet, &outVideoStream->time_base, "V");
 #endif
             ret = av_interleaved_write_frame(outFmtContext, packet);
             if (ret < 0) {
@@ -308,16 +311,28 @@ int add_bgm(const char *output_filename, const char *input_filename, const char 
                 }
             }
 
+            for (int j = 0; j < mixFrame->nb_samples; ++j) {
+                for (int ch = 0; ch < mixFrame->channels; ++ch) {
+                    fwrite(mixFrame->data[ch] + j * 4, 4, 1, mix);
+                }
+            }
+
+            mixFrame->pts = inputFrame->pts;
+            mixFrame->flags = 0;
+            mixFrame->extended_data = nullptr;
+
             ret = avcodec_send_frame(outAudioContext, mixFrame);
             if (ret < 0) LOGW(TAG, "encode mix frame error: %s\n", av_err2str(ret));
             encode:
-            ret = avcodec_receive_packet(outAudioContext, mixPacket);
+            AVPacket mixPacket{0};
+            av_init_packet(&mixPacket);
+            ret = avcodec_receive_packet(outAudioContext, &mixPacket);
             if (ret == 0) {
-                mixPacket->stream_index = outAudioStream->index;
+                mixPacket.stream_index = outAudioStream->index;
 #ifdef DEBUG
-                logPacket(mixPacket, &outAudioStream->time_base, "A");
+                logPacket(&mixPacket, &outAudioStream->time_base, "A");
 #endif
-                ret = av_interleaved_write_frame(outFmtContext, mixPacket);
+                ret = av_interleaved_write_frame(outFmtContext, &mixPacket);
                 if (ret < 0) {
                     LOGW(TAG, "audio frame write error: %s\n", av_err2str(ret));
                 }
@@ -333,6 +348,8 @@ int add_bgm(const char *output_filename, const char *input_filename, const char 
         }
     } while (true);
 
+    fclose(mix);
+
     filter.destroy();
 
     av_write_trailer(outFmtContext);
@@ -344,7 +361,6 @@ int add_bgm(const char *output_filename, const char *input_filename, const char 
     av_frame_free(&inputFrame);
     av_frame_free(&bgmFrame);
     av_packet_free(&packet);
-    av_packet_free(&mixPacket);
     av_packet_free(&bgmPacket);
 
     avformat_close_input(&inFmtContext);

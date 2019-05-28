@@ -41,6 +41,7 @@ public class EditActivity extends AppCompatActivity {
     @Override
     protected void onStart() {
         super.onStart();
+        Log.d(TAG, "onStart");
         if (player == null) {
             player = ExoPlayerFactory.newSimpleInstance(this);
             playerView.setPlayer(player);
@@ -48,19 +49,21 @@ public class EditActivity extends AppCompatActivity {
         if (executorService == null) {
             executorService = Executors.newSingleThreadExecutor();
         }
-//        executorService.submit(() -> {
-//            String uri = testBGM();
-//            runOnUiThread(() -> {
-//                if (uri != null) {
-//                    Toast.makeText(EditActivity.this, "finished: " + uri, Toast.LENGTH_SHORT).show();
-//                    playVideo(uri);
-//                } else {
-//                    Log.e(TAG, "unable to mux video");
-//                }
-//            });
-//
-//        });
-        playVideo(Environment.getExternalStorageDirectory() + File.separator + "mux.mp4");
+        Log.d(TAG, "start executor");
+        executorService.submit(() -> {
+            Log.d(TAG, "start background task");
+            String uri = testBGM();
+            Log.d(TAG, "finish background task");
+            runOnUiThread(() -> {
+                if (uri != null) {
+                    Toast.makeText(EditActivity.this, "finished: " + uri, Toast.LENGTH_SHORT).show();
+                    playVideo(uri);
+                } else {
+                    Log.e(TAG, "unable to mux video");
+                }
+            });
+
+        });
     }
 
     @Override
@@ -93,8 +96,8 @@ public class EditActivity extends AppCompatActivity {
     }
 
     private String testBGM() {
-        File video = new File(Environment.getExternalStorageDirectory(), "Download/input.mp4");
-        File bgm = new File(Environment.getExternalStorageDirectory(), "Download/bgm.aac");
+        File video = new File(Environment.getExternalStorageDirectory(), "mux.mp4");
+        File bgm = new File(Environment.getExternalStorageDirectory(), "Download/audio.aac");
         String uri = Environment.getExternalStorageDirectory() + File.separator + "mix.mp4";
         VideoEditor editor = new VideoEditor();
 

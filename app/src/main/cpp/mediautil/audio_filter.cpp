@@ -21,7 +21,6 @@ int AudioFilter::create(const char *filter_descr, AudioConfig* inConfig1, AudioC
     char ch_layout[128];
     int nb_channels = 0;
     int pix_fmts[] = {outConfig->format, AV_SAMPLE_FMT_NONE};
-    int sample_rates[] = {44100, 48000};
 
     filter_graph = avfilter_graph_alloc();
     if (!inputs[0] || !inputs[1] || !output || !filter_graph) {

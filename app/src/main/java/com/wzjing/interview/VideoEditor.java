@@ -19,7 +19,6 @@ public class VideoEditor {
         System.loadLibrary("avfilter");
         System.loadLibrary("swscale");
         System.loadLibrary("swresample");
-        System.loadLibrary("postproc");
         System.loadLibrary("x264");
     }
 
