@@ -19,54 +19,65 @@ import com.google.android.exoplayer2.util.Util;
 
 import java.io.File;
 import java.util.HashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class EditActivity extends AppCompatActivity {
 
     private final String TAG = EditActivity.class.getSimpleName();
 
     private ExoPlayer player;
+    private PlayerView playerView;
+    private static ExecutorService executorService;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_edit);
 
-
-        PlayerView playerView = findViewById(R.id.playerView);
-//        DefaultTrackSelector trackSelector = new DefaultTrackSelector();
-//        LoadControl loadControl = new DefaultLoadControl();
-//        player = ExoPlayerFactory.newSimpleInstance(this);
-//        playerView.setPlayer(player);
-
-        Thread videoThread = new Thread(() -> {
-            String uri = testMux();
-            runOnUiThread(() -> {
-                if (uri != null) {
-//                    playVideo(uri);
-                    Toast.makeText(EditActivity.this, "finished: " + uri, Toast.LENGTH_SHORT).show();
-                } else {
-                    Log.e(TAG, "unable to mux video");
-                }
-            });
-        });
-        videoThread.setName("VideoThread");
-        videoThread.start();
-
+        playerView = findViewById(R.id.playerView);
     }
 
     @Override
-    protected void onDestroy() {
-        super.onDestroy();
-//        player.stop();
-//        player.release();
+    protected void onStart() {
+        super.onStart();
+        if (player == null) {
+            player = ExoPlayerFactory.newSimpleInstance(this);
+            playerView.setPlayer(player);
+        }
+        if (executorService == null) {
+            executorService = Executors.newSingleThreadExecutor();
+        }
+//        executorService.submit(() -> {
+//            String uri = testBGM();
+//            runOnUiThread(() -> {
+//                if (uri != null) {
+//                    Toast.makeText(EditActivity.this, "finished: " + uri, Toast.LENGTH_SHORT).show();
+//                    playVideo(uri);
+//                } else {
+//                    Log.e(TAG, "unable to mux video");
+//                }
+//            });
+//
+//        });
+        playVideo(Environment.getExternalStorageDirectory() + File.separator + "mux.mp4");
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        if (player != null) {
+            player.release();
+            player = null;
+        }
     }
 
     private void playVideo(String uri) {
         DataSource.Factory sourceFactory = new DefaultDataSourceFactory(this, Util.getUserAgent(this, "InterView"));
         MediaSource source = new ExtractorMediaSource.Factory(sourceFactory)
                 .createMediaSource(Uri.parse(uri));
-        player.prepare(source);
         player.setRepeatMode(Player.REPEAT_MODE_ONE);
+        player.prepare(source);
         player.setPlayWhenReady(true);
     }
 
@@ -82,11 +93,11 @@ public class EditActivity extends AppCompatActivity {
     }
 
     private String testBGM() {
-        File video = new File(Environment.getExternalStorageDirectory(), "Download/video.ts");
+        File video = new File(Environment.getExternalStorageDirectory(), "Download/input.mp4");
         File bgm = new File(Environment.getExternalStorageDirectory(), "Download/bgm.aac");
-        String uri = Environment.getExternalStorageDirectory() + File.separator + "mix.ts";
+        String uri = Environment.getExternalStorageDirectory() + File.separator + "mix.mp4";
         VideoEditor editor = new VideoEditor();
-        editor.addBGM(uri, video, bgm, 1.6f);
-        return uri;
+
+        return editor.addBGM(uri, video, bgm, 1.6f) ? uri : null;
     }
 }

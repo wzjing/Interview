@@ -15,8 +15,9 @@ add_library(native-lib SHARED
         mediautil/bitmap_utils.cpp
         mediautil/log.h
         mediautil/log.cpp
-        native-lib.cpp
-        )
+        mediautil/clip.h
+        mediautil/clip.cpp
+        native-lib.cpp)
 
 function(import_library name type filename)
     add_library(${name} ${type} IMPORTED)

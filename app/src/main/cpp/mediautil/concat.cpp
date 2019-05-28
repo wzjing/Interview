@@ -740,7 +740,6 @@ int concat_encode(JNIEnv *env, const char *output_filename, const char **input_f
             return -1;
         }
         AVDictionary *dec_opt = nullptr;
-        av_dict_set(&dec_opt, "refcounted_frames", "1", 0);
         for (int j = 0; j < videos[i]->formatContext->nb_streams; ++j) {
             if (videos[i]->formatContext->streams[j]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
                 videos[i]->videoStream = videos[i]->formatContext->streams[j];
@@ -817,7 +816,6 @@ int concat_encode(JNIEnv *env, const char *output_filename, const char **input_f
         av_dict_set(&video_encode_opt, "preset", "ultrafast", 0);
         av_dict_set(&video_encode_opt, "tune", "zerolatency", 0);
     }
-    av_dict_set(&video_encode_opt, "refcounted_frames", "1", 0);
     if (outFmtContext->oformat->flags & AVFMT_GLOBALHEADER)
         outVideoContext->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
     ret = avcodec_open2(outVideoContext, outVideoCodec, &video_encode_opt);
@@ -850,7 +848,6 @@ int concat_encode(JNIEnv *env, const char *output_filename, const char **input_f
 
 
     AVDictionary *audio_encode_opt = nullptr;
-    av_dict_set(&video_encode_opt, "refcounted_frames", "1", 0);
 
     if (outFmtContext->oformat->flags & AVFMT_GLOBALHEADER)
         outAudioContext->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
@@ -1119,8 +1116,6 @@ int concat_encode(JNIEnv *env, const char *output_filename, const char **input_f
                 }
 
 
-                av_frame_unref(inVideoFrame);
-                av_frame_unref(outVideoFrame);
                 do {
                     AVPacket outPkt{0};
                     av_init_packet(&outPkt);
@@ -1167,8 +1162,6 @@ int concat_encode(JNIEnv *env, const char *output_filename, const char **input_f
                     return -1;
                 }
 
-                av_frame_unref(inAudioFrame);
-                av_frame_unref(outAudioFrame);
                 do {
                     AVPacket outPkt{0};
                     av_init_packet(&outPkt);

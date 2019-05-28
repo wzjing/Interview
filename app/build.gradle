@@ -43,6 +43,27 @@ android {
             jniLibs.srcDirs 'src/main/cpp/thirdpart/lib'
         }
     }
+    flavorDimensions 'arch'
+    productFlavors {
+        arm {
+            dimension = 'arch'
+            externalNativeBuild {
+                cmake {
+                    cppFlags "-std=c++11"
+                    abiFilters 'armeabi-v7a'
+                }
+            }
+        }
+        x86 {
+            dimension = 'arch'
+            externalNativeBuild {
+                cmake {
+                    cppFlags "-std=c++11"
+                    abiFilters 'x86'
+                }
+            }
+        }
+    }
 }
 
 dependencies {

@@ -144,22 +144,22 @@ void AudioFilter::destroy() {
 }
 
 int AudioFilter::filter(AVFrame *input1, AVFrame *input2, AVFrame *result) {
-    int ret = av_buffersrc_add_frame(buffersrc1_ctx, input1);
+    int ret = av_buffersrc_add_frame_flags(buffersrc1_ctx, input1, AV_BUFFERSRC_FLAG_KEEP_REF);
     if (ret < 0) {
         LOGE(TAG, "add audio input1 error: %s\n", av_err2str(ret));
-        return -1;
+        return ret;
     }
 
-    ret = av_buffersrc_add_frame(buffersrc2_ctx, input2);
+    ret = av_buffersrc_add_frame_flags(buffersrc2_ctx, input2, AV_BUFFERSRC_FLAG_KEEP_REF);
     if (ret < 0) {
         LOGE(TAG, "add audio input1 error: %s\n", av_err2str(ret));
-        return -1;
+        return ret;
     }
 
     ret = av_buffersink_get_frame(buffersink_ctx, result);
     if (ret < 0) {
         LOGE(TAG, "get audio output error: %s\n", av_err2str(ret));
-        return -1;
+        return ret;
     }
     return 0;
 }

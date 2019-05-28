@@ -4,6 +4,9 @@ import android.net.Uri;
 import android.support.annotation.Nullable;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.util.Log;
+import android.view.View;
+import android.widget.ProgressBar;
 
 import com.google.android.exoplayer2.DefaultLoadControl;
 import com.google.android.exoplayer2.DefaultRenderersFactory;
@@ -12,6 +15,8 @@ import com.google.android.exoplayer2.ExoPlayerFactory;
 import com.google.android.exoplayer2.Player;
 import com.google.android.exoplayer2.SimpleExoPlayer;
 import com.google.android.exoplayer2.Timeline;
+import com.google.android.exoplayer2.drm.DefaultDrmSessionManager;
+import com.google.android.exoplayer2.drm.FrameworkMediaCrypto;
 import com.google.android.exoplayer2.source.ExtractorMediaSource;
 import com.google.android.exoplayer2.source.MediaSource;
 import com.google.android.exoplayer2.source.dash.DashChunkSource;
@@ -32,28 +37,92 @@ import com.google.android.exoplayer2.util.Util;
 
 public class StreamActivity extends AppCompatActivity {
 
+    private final String TAG = StreamActivity.class.getSimpleName();
+
     private SimpleExoPlayer player;
     private static final DefaultBandwidthMeter BANDWIDTH_METER =
             new DefaultBandwidthMeter();
+    private long playbackPosition;
+    private int currentWindow;
+    private boolean playWhenReady;
+    PlayerView playerView;
+    ProgressBar progressBar;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_stream);
 
-        PlayerView playerView = findViewById(R.id.playerView);
+        playerView = findViewById(R.id.playerView);
+        progressBar = findViewById(R.id.progressbar);
 
-        Uri dashUri = Uri.parse("http://10.0.2.2:3000/mux.mpd");
-        TrackSelection.Factory adaptiveTrackSelectionFactory =
-                new AdaptiveTrackSelection.Factory(BANDWIDTH_METER);
-        SimpleExoPlayer player = ExoPlayerFactory.newSimpleInstance(
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
+        if (Util.SDK_INT > 23) {
+            initializePlayer();
+        }
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        if ((Util.SDK_INT <= 23 || player == null)) {
+            initializePlayer();
+        }
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        if (Util.SDK_INT <= 23) {
+            releasePlayer();
+        }
+    }
+
+    @Override
+    public void onStop() {
+        super.onStop();
+        if (Util.SDK_INT > 23) {
+            releasePlayer();
+        }
+    }
+
+    void initializePlayer() {
+        player = ExoPlayerFactory.newSimpleInstance(
+                this,
                 new DefaultRenderersFactory(this),
-                new DefaultTrackSelector(adaptiveTrackSelectionFactory));
-        MediaSource mediaSource = buildMediaSource(dashUri);
+                new DefaultTrackSelector(new AdaptiveTrackSelection.Factory()),
+                new DefaultLoadControl(),
+                null,
+                BANDWIDTH_METER);
         playerView.setPlayer(player);
-        player.setPlayWhenReady(true);
+        MediaSource mediaSource = buildMediaSource(Uri.parse("http://10.0.2.2:3000/mux.mpd"));
+        player.prepare(mediaSource, true, false);
+        player.addListener(new Player.EventListener() {
+            @Override
+            public void onLoadingChanged(boolean isLoading) {
+                progressBar.setVisibility(isLoading ? View.VISIBLE : View.GONE);
+            }
 
-        player.prepare(mediaSource);
+            @Override
+            public void onPlayerStateChanged(boolean playWhenReady, int playbackState) {
+                Log.d(TAG, "PayWhenReady: " + playWhenReady + ", PlayBack: " + playbackState);
+            }
+        });
+        player.setPlayWhenReady(true);
+    }
+
+    private void releasePlayer() {
+        if (player != null) {
+//            playbackPosition = player.getCurrentPosition();
+//            currentWindow = player.getCurrentWindowIndex();
+//            playWhenReady = player.getPlayWhenReady();
+            player.release();
+            player = null;
+        }
     }
 
     private MediaSource buildMediaSource(Uri uri) {
@@ -64,21 +133,5 @@ public class StreamActivity extends AppCompatActivity {
                         new DefaultHttpDataSourceFactory("ua", BANDWIDTH_METER));
         return new DashMediaSource.Factory(dashChunkSourceFactory,
                 manifestDataSourceFactory).createMediaSource(uri);
-    }
-
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        player.stop();
-        player.release();
-    }
-
-    private void playVideo(String uri) {
-        DataSource.Factory sourceFactory = new DefaultDataSourceFactory(this, Util.getUserAgent(this, "InterView"));
-        MediaSource source = new ExtractorMediaSource.Factory(sourceFactory)
-                .createMediaSource(Uri.parse(uri));
-        player.prepare(source);
-        player.setRepeatMode(Player.REPEAT_MODE_ONE);
-        player.setPlayWhenReady(true);
     }
 }
