@@ -13,14 +13,39 @@
 
     </com.google.android.exoplayer2.ui.PlayerView>
 
+    <android.support.design.widget.FloatingActionButton
+        android:id="@+id/concatBtn"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="10dp"
+        android:layout_marginRight="10dp"
+        app:backgroundTint="@color/colorPrimary"
+        app:layout_constraintBottom_toTopOf="@id/bgmBtn"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_chainStyle="packed"
+        app:srcCompat="@drawable/ic_concat" />
 
-<!--    <ProgressBar-->
-<!--        android:id="@+id/progressbar"-->
-<!--        android:layout_width="wrap_content"-->
-<!--        android:layout_height="wrap_content"-->
-<!--        app:layout_constraintBottom_toBottomOf="parent"-->
-<!--        app:layout_constraintEnd_toEndOf="parent"-->
-<!--        app:layout_constraintStart_toStartOf="parent"-->
-<!--        app:layout_constraintTop_toTopOf="parent" />-->
+    <android.support.design.widget.FloatingActionButton
+        android:id="@+id/bgmBtn"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:layout_marginBottom="20dp"
+        app:backgroundTint="@color/colorPrimary"
+        app:layout_constraintBottom_toTopOf="@id/clipBtn"
+        app:layout_constraintEnd_toEndOf="@id/concatBtn"
+        app:layout_constraintTop_toBottomOf="@id/concatBtn"
+        app:srcCompat="@drawable/ic_bgm" />
+
+    <android.support.design.widget.FloatingActionButton
+        android:id="@+id/clipBtn"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:backgroundTint="@color/colorPrimary"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="@id/concatBtn"
+        app:layout_constraintTop_toBottomOf="@id/bgmBtn"
+        app:srcCompat="@drawable/ic_clip" />
 
 </android.support.constraint.ConstraintLayout>

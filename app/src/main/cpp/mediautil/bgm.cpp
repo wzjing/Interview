@@ -219,9 +219,7 @@ int add_bgm(const char *output_filename, const char *input_filename, const char 
              "[in2]volume=volume=%f[out2];[in1][out2]amix[out]",
              bgm_volume);
     filter.create(filter_description, &config1, &config2, &configOut);
-    filter.dumpGraph();
-
-    FILE *mix = fopen("/storage/emulated/0/mix.pcm", "wb");
+//    filter.dumpGraph();
 
     do {
         ret = av_read_frame(inFmtContext, packet);
@@ -311,12 +309,6 @@ int add_bgm(const char *output_filename, const char *input_filename, const char 
                 }
             }
 
-            for (int j = 0; j < mixFrame->nb_samples; ++j) {
-                for (int ch = 0; ch < mixFrame->channels; ++ch) {
-                    fwrite(mixFrame->data[ch] + j * 4, 4, 1, mix);
-                }
-            }
-
             mixFrame->pts = inputFrame->pts;
             mixFrame->flags = 0;
             mixFrame->extended_data = nullptr;
@@ -347,8 +339,6 @@ int add_bgm(const char *output_filename, const char *input_filename, const char 
             LOGD(TAG, "\n");
         }
     } while (true);
-
-    fclose(mix);
 
     filter.destroy();
 

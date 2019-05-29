@@ -1,5 +1,6 @@
 package com.wzjing.interview.record;
 
+import android.media.MediaCodecInfo;
 import android.media.MediaRecorder;
 import android.os.Build;
 import android.support.annotation.NonNull;
@@ -167,7 +168,7 @@ public class VideoRecorder {
         mediaRecorder.setAudioEncodingBitRate(96000);
         mediaRecorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264);
         mediaRecorder.setVideoFrameRate(30);
-        mediaRecorder.setVideoEncodingBitRate(2000000);
+        mediaRecorder.setVideoEncodingBitRate(4000000);
         mediaRecorder.setVideoSize(width, height);
     }
 

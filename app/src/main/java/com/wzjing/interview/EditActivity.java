@@ -3,6 +3,7 @@ package com.wzjing.interview;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
+import android.support.design.widget.FloatingActionButton;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.widget.Toast;
@@ -36,6 +37,55 @@ public class EditActivity extends AppCompatActivity {
         setContentView(R.layout.activity_edit);
 
         playerView = findViewById(R.id.playerView);
+
+        FloatingActionButton concatBtn = findViewById(R.id.concatBtn);
+        FloatingActionButton bgmBtn = findViewById(R.id.bgmBtn);
+        FloatingActionButton clipBtn = findViewById(R.id.clipBtn);
+
+        concatBtn.setOnClickListener(v -> {
+            executorService.submit(() -> {
+                String uri = testConcat();
+                runOnUiThread(() -> {
+                    if (uri != null) {
+                        Toast.makeText(EditActivity.this, "concat finished: " + uri, Toast.LENGTH_SHORT).show();
+                        playVideo(uri);
+                    } else {
+                        Toast.makeText(EditActivity.this, "unable to concat", Toast.LENGTH_SHORT).show();
+                    }
+                });
+
+            });
+        });
+
+        bgmBtn.setOnClickListener(v -> {
+            executorService.submit(() -> {
+                String uri = testBGM();
+                runOnUiThread(() -> {
+                    if (uri != null) {
+                        Toast.makeText(EditActivity.this, "bgm finished: " + uri, Toast.LENGTH_SHORT).show();
+                        playVideo(uri);
+                    } else {
+                        Toast.makeText(EditActivity.this, "unable to add bgm", Toast.LENGTH_SHORT).show();
+                    }
+                });
+
+            });
+        });
+
+        clipBtn.setOnClickListener(v -> {
+            executorService.submit(() -> {
+                String uri = testClip();
+                runOnUiThread(() -> {
+                    if (uri != null) {
+                        Toast.makeText(EditActivity.this, "clip finished: " + uri, Toast.LENGTH_SHORT).show();
+                        playVideo(uri);
+                    } else {
+                        Toast.makeText(EditActivity.this, "unable to clip", Toast.LENGTH_SHORT).show();
+                    }
+                });
+
+            });
+        });
     }
 
     @Override
@@ -49,21 +99,6 @@ public class EditActivity extends AppCompatActivity {
         if (executorService == null) {
             executorService = Executors.newSingleThreadExecutor();
         }
-        Log.d(TAG, "start executor");
-        executorService.submit(() -> {
-            Log.d(TAG, "start background task");
-            String uri = testBGM();
-            Log.d(TAG, "finish background task");
-            runOnUiThread(() -> {
-                if (uri != null) {
-                    Toast.makeText(EditActivity.this, "finished: " + uri, Toast.LENGTH_SHORT).show();
-                    playVideo(uri);
-                } else {
-                    Log.e(TAG, "unable to mux video");
-                }
-            });
-
-        });
     }
 
     @Override
@@ -76,6 +111,7 @@ public class EditActivity extends AppCompatActivity {
     }
 
     private void playVideo(String uri) {
+        player.stop(true);
         DataSource.Factory sourceFactory = new DefaultDataSourceFactory(this, Util.getUserAgent(this, "InterView"));
         MediaSource source = new ExtractorMediaSource.Factory(sourceFactory)
                 .createMediaSource(Uri.parse(uri));
@@ -84,7 +120,7 @@ public class EditActivity extends AppCompatActivity {
         player.setPlayWhenReady(true);
     }
 
-    private String testMux() {
+    private String testConcat() {
         File video0 = new File(Environment.getExternalStorageDirectory(), "Download/video0.mp4");
         File video1 = new File(Environment.getExternalStorageDirectory(), "Download/video1.mp4");
         VideoEditor editor = new VideoEditor();
@@ -92,15 +128,23 @@ public class EditActivity extends AppCompatActivity {
         HashMap<String, File> map = new HashMap<>();
         map.put("Question: how old are you", video0);
         map.put("Question: what is your skill", video1);
-        return editor.muxVideos(uri, map, 30, 2) ? uri : null;
+        return editor.concatVideos(uri, map, 40, 2) ? uri : null;
     }
 
     private String testBGM() {
         File video = new File(Environment.getExternalStorageDirectory(), "mux.mp4");
-        File bgm = new File(Environment.getExternalStorageDirectory(), "Download/audio.aac");
+        File bgm = new File(Environment.getExternalStorageDirectory(), "Download/bgm.aac");
         String uri = Environment.getExternalStorageDirectory() + File.separator + "mix.mp4";
         VideoEditor editor = new VideoEditor();
 
         return editor.addBGM(uri, video, bgm, 1.6f) ? uri : null;
+    }
+
+    private String testClip() {
+        File video = new File(Environment.getExternalStorageDirectory(), "mux.mp4");
+        String uri = Environment.getExternalStorageDirectory() + File.separator + "clip.mp4";
+        VideoEditor editor = new VideoEditor();
+
+        return editor.clip(uri, video, 2, 5) ? uri : null;
     }
 }
