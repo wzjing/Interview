@@ -13,7 +13,7 @@ void logPacket(AVPacket *packet, AVRational *timebase, const char *tag) {
     char tag_str[24];
     snprintf(tag_str, 24, "[\033[33m%s\033[0m]", tag);
     LOGD(TAG,
-         "Packet%-16.16s->\tstream: %d\tPTS: %8lld|%-8.8s\tDTS: %8lld|%-8.8s\tDuration: %8lld|%-8.8s\tflags:\033[34m%-8s\033[0m\tsize:%8d\tside_data: %s(%d)\n",
+         "Packet%-16.16s->\tstream: %d\tPTS: %12lld|%-8.8s\tDTS: %12lld|%-8.8s\tDuration: %8lld|%-8.8s\tflags:\033[34m%-8s\033[0m\tsize:%8d\tside_data: %s(%d)\n",
          tag_str,
          packet->stream_index,
          packet->pts,
@@ -48,9 +48,9 @@ void logFrame(AVFrame *frame, AVRational *timebase, const char *tag, int isVideo
                 break;
         }
         LOGD(TAG,
-             "VFrame%-16.16s->\ttype: video\tPTS: %8lld|%-8.8s\tDTS: %8lld|%-8.8s\tDuration: %8lld|%-8.8s\tfmt:%s\tpict: %-16s\tsize: %dx%d\n",
+             "VFrame%-16.16s->\ttype: video\tPTS: %12lld|%-8.8s\tDTS: %12lld|%-8.8s\tDuration: %8lld|%-8.8s\tfmt:%8s\tpict: %-16s\tsize: %dx%d\n",
              tag_str,
-             frame->pts,
+             frame->pts == AV_NOPTS_VALUE ? -1 : frame->pts,
              av_ts2timestr(frame->pts, timebase),
              frame->pkt_dts,
              av_ts2timestr(frame->pkt_dts, timebase),
@@ -62,29 +62,32 @@ void logFrame(AVFrame *frame, AVRational *timebase, const char *tag, int isVideo
              frame->height);
     } else {
         LOGD(TAG,
-             "AFrame%-16s->\ttype: audio\tPTS: %8lld|%-8.8s\tDTS: %8lld|%-8.8s\tDuration: %8lld|%-8.8s\tfmt: %s\tchannels: %d\trate: %d\n",
+             "AFrame%-16s->\ttype: audio\tPTS: %12lld|%-8.8s\tDTS: %12lld|%-8.8s\tDuration: %8lld|%-8.8s\tfmt: %8s\tchannels: %8d\trate: %8d\tsamples:%8d\tsize:%d|%d\n",
              tag_str,
-             frame->pts,
+             frame->pts == AV_NOPTS_VALUE ? -1 : frame->pts,
              av_ts2timestr(frame->pts, timebase),
-             frame->pkt_dts,
+             frame->pkt_dts == AV_NOPTS_VALUE ? -1 : frame->pkt_dts,
              av_ts2timestr(frame->pkt_dts, timebase),
              frame->pkt_duration,
              av_ts2timestr(frame->pkt_duration, timebase),
              av_get_sample_fmt_name((AVSampleFormat) frame->format),
              frame->channels,
-             frame->sample_rate);
+             frame->sample_rate,
+             frame->nb_samples,
+             frame->linesize[0] ? frame->linesize[0] : 0,
+             frame->linesize[1] ? frame->linesize[1] : 0);
     }
 }
 
 void logStream(AVStream *stream, const char *tag, int isVideo) {
-    if (isVideo) {
+    if (stream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
         LOGD(TAG, "\n\033[34mVideo Stream\033[0m(\033[33m%s\033[0m):\n"
-                  "\tindex: %d\n"
-                  "\ttimebase:     {%d, %d}\n"
-                  "\tframerate:    {%d, %d}\n"
-                  "\tdisplay ratio:%d:%d\n"
-                  "\tduration: %lld\n"
-                  "\tstart:    %lld\n\n",
+                  "\tindex:     %d\n"
+                  "\ttimebase:  {%d, %d}\n"
+                  "\tframerate: {%d, %d}\n"
+                  "\tratio:     %d:%d\n"
+                  "\tduration:  %lld\n"
+                  "\tstart:     %lld\n\n",
              tag,
              stream->index,
              stream->time_base.num,
@@ -95,23 +98,28 @@ void logStream(AVStream *stream, const char *tag, int isVideo) {
              stream->display_aspect_ratio.den,
              stream->duration,
              stream->first_dts == AV_NOPTS_VALUE ? -1 : stream->first_dts);
-    } else {
+    } else if (stream->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
         LOGD(TAG, "\n\033[34mAudio Stream\033[0m(\033[33m%s\033[0m)-:\n"
-                  "\tindex: %d\n"
+                  "\tindex:    %d\n"
                   "\ttimebase: {%d, %d}\n"
                   "\tduration: %lld\n"
+                  "\tframerate:{%d, %d}\n"
                   "\tstart:    %lld\n\n",
              tag,
              stream->index,
              stream->time_base.num,
              stream->time_base.den,
              stream->duration,
+             stream->avg_frame_rate.num,
+             stream->avg_frame_rate.den,
              stream->first_dts == AV_NOPTS_VALUE ? -1 : stream->first_dts);
     }
+    
+    logMetadata(stream->metadata, tag);
 }
 
 void logContext(AVCodecContext *context, const char *tag, int isVideo) {
-    if (isVideo) {
+    if (context->codec_type == AVMEDIA_TYPE_VIDEO) {
         LOGD(TAG, "\n\033[34mVideo Context\033[0m(\033[33m%s\033[0m):\n"
                   "\tcodec: %s\n"
                   "\tpix:   %s\n"
@@ -144,15 +152,12 @@ void logContext(AVCodecContext *context, const char *tag, int isVideo) {
              context->extradata_size,
              context->flags & AV_CODEC_FLAG_GLOBAL_HEADER ? "YES" : "NO"
         );
-    } else {
-        char* ch_layout = new char[128];
-        av_get_channel_layout_string(ch_layout, 128, av_get_channel_layout_nb_channels(context->channel_layout), context->channel_layout);
+    } else if (context->codec_type == AVMEDIA_TYPE_AUDIO) {
         LOGD(TAG, "\n\033[34mAudio Context\033[0m(\033[33m%s\033[0m):\n"
                   "\tcodec: %s\n"
                   "\tsample:%s\n"
                   "\tsample_rate: %d\n"
                   "\tbitrate:  %lld\n"
-                  "\tch_layout:  %s\n"
                   "\ttimebase: {%d, %d}\n"
                   "\textradata_size: %d\n"
                   "\tglobal_header: %s\n\n",
@@ -161,13 +166,11 @@ void logContext(AVCodecContext *context, const char *tag, int isVideo) {
              av_get_sample_fmt_name(context->sample_fmt),
              context->sample_rate,
              context->bit_rate,
-             ch_layout,
              context->time_base.num,
              context->time_base.den,
              context->extradata_size,
              context->flags & AV_CODEC_FLAG_GLOBAL_HEADER ? "YES" : "NO"
         );
-        delete [] ch_layout;
     }
 }
 

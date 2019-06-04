@@ -40,11 +40,17 @@ public:
 
     int create(const char *filter_descr, AudioConfig* inConfig1, AudioConfig* inConfig2, AudioConfig* outConfig);
 
+    int create(const char *filter_descr, AudioConfig* inConfig, AudioConfig* outConfig);
+
     void dumpGraph();
 
-    int filter(AVFrame *input1, AVFrame* input2);
-
     int filter(AVFrame *input1, AVFrame* input2, AVFrame* result);
+
+    int addInput1(AVFrame * input);
+
+    int addInput2(AVFrame* input);
+
+    int getFrame(AVFrame* result);
 
     void destroy();
 };

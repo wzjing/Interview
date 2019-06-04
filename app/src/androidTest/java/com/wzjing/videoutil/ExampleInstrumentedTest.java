@@ -1,4 +1,4 @@
-package com.wzjing.interview;
+package com.wzjing.videoutil;
 
 import android.content.Context;
 import android.support.test.InstrumentationRegistry;

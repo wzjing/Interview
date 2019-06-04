@@ -1,4 +1,4 @@
-package com.wzjing.interview;
+package com.wzjing.videoutil;
 
 import android.content.Intent;
 import android.os.Bundle;

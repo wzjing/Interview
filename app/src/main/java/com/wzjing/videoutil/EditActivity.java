@@ -1,11 +1,14 @@
-package com.wzjing.interview;
+package com.wzjing.videoutil;
 
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
 import android.support.design.widget.FloatingActionButton;
+import android.support.v4.os.EnvironmentCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
+import android.view.View;
+import android.widget.ProgressBar;
 import android.widget.Toast;
 
 import com.google.android.exoplayer2.ExoPlayer;
@@ -29,7 +32,10 @@ public class EditActivity extends AppCompatActivity {
 
     private ExoPlayer player;
     private PlayerView playerView;
+    private ProgressBar progressBar;
     private static ExecutorService executorService;
+
+    private String uri = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -37,55 +43,17 @@ public class EditActivity extends AppCompatActivity {
         setContentView(R.layout.activity_edit);
 
         playerView = findViewById(R.id.playerView);
+        progressBar = findViewById(R.id.progressbar);
 
         FloatingActionButton concatBtn = findViewById(R.id.concatBtn);
         FloatingActionButton bgmBtn = findViewById(R.id.bgmBtn);
         FloatingActionButton clipBtn = findViewById(R.id.clipBtn);
 
-        concatBtn.setOnClickListener(v -> {
-            executorService.submit(() -> {
-                String uri = testConcat();
-                runOnUiThread(() -> {
-                    if (uri != null) {
-                        Toast.makeText(EditActivity.this, "concat finished: " + uri, Toast.LENGTH_SHORT).show();
-                        playVideo(uri);
-                    } else {
-                        Toast.makeText(EditActivity.this, "unable to concat", Toast.LENGTH_SHORT).show();
-                    }
-                });
+        concatBtn.setOnClickListener(v -> testConcat());
 
-            });
-        });
+        bgmBtn.setOnClickListener(v -> testBGM());
 
-        bgmBtn.setOnClickListener(v -> {
-            executorService.submit(() -> {
-                String uri = testBGM();
-                runOnUiThread(() -> {
-                    if (uri != null) {
-                        Toast.makeText(EditActivity.this, "bgm finished: " + uri, Toast.LENGTH_SHORT).show();
-                        playVideo(uri);
-                    } else {
-                        Toast.makeText(EditActivity.this, "unable to add bgm", Toast.LENGTH_SHORT).show();
-                    }
-                });
-
-            });
-        });
-
-        clipBtn.setOnClickListener(v -> {
-            executorService.submit(() -> {
-                String uri = testClip();
-                runOnUiThread(() -> {
-                    if (uri != null) {
-                        Toast.makeText(EditActivity.this, "clip finished: " + uri, Toast.LENGTH_SHORT).show();
-                        playVideo(uri);
-                    } else {
-                        Toast.makeText(EditActivity.this, "unable to clip", Toast.LENGTH_SHORT).show();
-                    }
-                });
-
-            });
-        });
+        clipBtn.setOnClickListener(v -> testClip());
     }
 
     @Override
@@ -111,6 +79,7 @@ public class EditActivity extends AppCompatActivity {
     }
 
     private void playVideo(String uri) {
+        Log.d(TAG, "playing: "+uri);
         player.stop(true);
         DataSource.Factory sourceFactory = new DefaultDataSourceFactory(this, Util.getUserAgent(this, "InterView"));
         MediaSource source = new ExtractorMediaSource.Factory(sourceFactory)
@@ -120,31 +89,55 @@ public class EditActivity extends AppCompatActivity {
         player.setPlayWhenReady(true);
     }
 
-    private String testConcat() {
-        File video0 = new File(Environment.getExternalStorageDirectory(), "Download/video0.mp4");
-        File video1 = new File(Environment.getExternalStorageDirectory(), "Download/video1.mp4");
+    private void testConcat() {
+        progressBar.setVisibility(View.VISIBLE);
+        File root = Environment.getExternalStorageDirectory();
+        File video0 = new File(root, "Download/video0.mp4");
+        File video1 = new File(root, "Download/video1.mp4");
         VideoEditor editor = new VideoEditor();
-        String uri = Environment.getExternalStorageDirectory() + File.separator + "mux.mp4";
+        uri = root.getAbsolutePath() + File.separator + "mux.mp4";
         HashMap<String, File> map = new HashMap<>();
         map.put("Question: how old are you", video0);
         map.put("Question: what is your skill", video1);
-        return editor.concatVideos(uri, map, 40, 2) ? uri : null;
+        editor.concatVideos(uri, map, 40, 2, false, mListener);
     }
 
-    private String testBGM() {
-        File video = new File(Environment.getExternalStorageDirectory(), "mux.mp4");
-        File bgm = new File(Environment.getExternalStorageDirectory(), "Download/bgm.aac");
-        String uri = Environment.getExternalStorageDirectory() + File.separator + "mix.mp4";
+    private void testBGM() {
+        progressBar.setVisibility(View.VISIBLE);
+        File root = Environment.getExternalStorageDirectory();
+        File video = new File(root, "Download/test.mp4");
+        File bgm = new File(root, "Download/bgm.aac");
+        uri = root.getAbsolutePath() + File.separator + "mix.mp4";
         VideoEditor editor = new VideoEditor();
-
-        return editor.addBGM(uri, video, bgm, 1.6f) ? uri : null;
+        editor.addBGM(uri, video, bgm, 1.6f, mListener);
     }
 
-    private String testClip() {
-        File video = new File(Environment.getExternalStorageDirectory(), "mux.mp4");
-        String uri = Environment.getExternalStorageDirectory() + File.separator + "clip.mp4";
+    private void testClip() {
+        progressBar.setVisibility(View.VISIBLE);
+        File root = Environment.getExternalStorageDirectory();
+        File video = new File(root, "Download/test.mp4");
+        uri = root.getAbsolutePath() + File.separator + "clip.mp4";
         VideoEditor editor = new VideoEditor();
-
-        return editor.clip(uri, video, 2, 5) ? uri : null;
+        editor.clip(uri, video, 2, 5, mListener);
     }
+
+    private VideoEditor.VideoEditorListener mListener = new VideoEditor.VideoEditorListener() {
+        @Override
+        void onError(String msg) {
+            progressBar.setVisibility(View.INVISIBLE);
+            Toast.makeText(EditActivity.this, "Error: " + msg, Toast.LENGTH_SHORT).show();
+        }
+
+        @Override
+        void onProgress(int progress) {
+            Log.d(TAG, "progress: " + progress);
+            progressBar.setProgress(progress);
+        }
+
+        @Override
+        void onFinished() {
+            progressBar.setVisibility(View.INVISIBLE);
+            if (uri != null) playVideo(uri);
+        }
+    };
 }

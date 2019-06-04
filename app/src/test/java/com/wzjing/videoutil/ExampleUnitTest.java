@@ -1,4 +1,4 @@
-package com.wzjing.interview;
+package com.wzjing.videoutil;
 
 import org.junit.Test;
 

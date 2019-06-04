@@ -1,4 +1,4 @@
-package com.wzjing.interview.jni;
+package com.wzjing.videoutil.jni;
 
 import android.graphics.Bitmap;
 import android.graphics.Canvas;

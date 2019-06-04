@@ -6,7 +6,7 @@
 #include <cstring>
 #include "log.h"
 
-#define JNI_CLASS(sub_clazz) "com/wzjing/interview/" sub_clazz
+#define JNI_CLASS(sub_clazz) "com/wzjing/videoutil/" sub_clazz
 
 const char *Bimap_TAG = "bitmap_utils";
 

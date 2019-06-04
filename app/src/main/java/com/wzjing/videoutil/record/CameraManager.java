@@ -1,4 +1,4 @@
-package com.wzjing.interview.record;
+package com.wzjing.videoutil.record;
 
 import android.graphics.ImageFormat;
 import android.hardware.Camera;

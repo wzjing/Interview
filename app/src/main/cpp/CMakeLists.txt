@@ -2,22 +2,9 @@ cmake_minimum_required(VERSION 3.10)
 
 add_definitions(-DDEBUG)
 
-add_library(native-lib SHARED
-        mediautil/bgm.h
-        mediautil/bgm.cpp
-        mediautil/concat.h
-        mediautil/concat.cpp
-        mediautil/audio_filter.h
-        mediautil/audio_filter.cpp
-        mediautil/video_filter.h
-        mediautil/video_filter.cpp
-        mediautil/bitmap_utils.h
-        mediautil/bitmap_utils.cpp
-        mediautil/log.h
-        mediautil/log.cpp
-        mediautil/clip.h
-        mediautil/clip.cpp
-        native-lib.cpp)
+aux_source_directory(mediautil SOURCES)
+
+add_library(native-lib SHARED ${SOURCES} native-lib.cpp VideoEditorListener.cpp)
 
 function(import_library name type filename)
     add_library(${name} ${type} IMPORTED)

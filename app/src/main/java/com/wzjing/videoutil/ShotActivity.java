@@ -1,4 +1,4 @@
-package com.wzjing.interview;
+package com.wzjing.videoutil;
 
 import android.Manifest;
 import android.content.pm.PackageManager;
@@ -19,7 +19,7 @@ import android.view.SurfaceView;
 import android.view.View;
 import android.widget.Chronometer;
 
-import com.wzjing.interview.record.VideoRecorder;
+import com.wzjing.videoutil.record.VideoRecorder;
 
 import java.io.File;
 

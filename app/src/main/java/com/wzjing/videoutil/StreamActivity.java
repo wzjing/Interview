@@ -1,52 +1,48 @@
-package com.wzjing.interview;
+package com.wzjing.videoutil;
 
+import android.annotation.SuppressLint;
 import android.net.Uri;
-import android.support.annotation.Nullable;
-import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.os.Environment;
+import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
 import android.widget.ProgressBar;
 
 import com.google.android.exoplayer2.DefaultLoadControl;
 import com.google.android.exoplayer2.DefaultRenderersFactory;
-import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.ExoPlayerFactory;
 import com.google.android.exoplayer2.Player;
 import com.google.android.exoplayer2.SimpleExoPlayer;
-import com.google.android.exoplayer2.Timeline;
-import com.google.android.exoplayer2.drm.DefaultDrmSessionManager;
-import com.google.android.exoplayer2.drm.FrameworkMediaCrypto;
 import com.google.android.exoplayer2.source.ExtractorMediaSource;
 import com.google.android.exoplayer2.source.MediaSource;
+import com.google.android.exoplayer2.source.SingleSampleMediaSource;
 import com.google.android.exoplayer2.source.dash.DashChunkSource;
 import com.google.android.exoplayer2.source.dash.DashMediaSource;
 import com.google.android.exoplayer2.source.dash.DefaultDashChunkSource;
-import com.google.android.exoplayer2.source.dash.manifest.DashManifest;
 import com.google.android.exoplayer2.trackselection.AdaptiveTrackSelection;
 import com.google.android.exoplayer2.trackselection.DefaultTrackSelector;
-import com.google.android.exoplayer2.trackselection.TrackSelection;
-import com.google.android.exoplayer2.trackselection.TrackSelector;
 import com.google.android.exoplayer2.ui.PlayerView;
-import com.google.android.exoplayer2.upstream.BandwidthMeter;
 import com.google.android.exoplayer2.upstream.DataSource;
 import com.google.android.exoplayer2.upstream.DefaultBandwidthMeter;
 import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory;
 import com.google.android.exoplayer2.upstream.DefaultHttpDataSourceFactory;
 import com.google.android.exoplayer2.util.Util;
 
+import java.io.File;
+
 public class StreamActivity extends AppCompatActivity {
 
     private final String TAG = StreamActivity.class.getSimpleName();
 
+    private static final DefaultBandwidthMeter BANDWIDTH_METER = new DefaultBandwidthMeter();
     private SimpleExoPlayer player;
-    private static final DefaultBandwidthMeter BANDWIDTH_METER =
-            new DefaultBandwidthMeter();
+    private PlayerView playerView;
+    ProgressBar progressBar;
+
     private long playbackPosition;
     private int currentWindow;
-    private boolean playWhenReady;
-    PlayerView playerView;
-    ProgressBar progressBar;
+    private boolean playWhenReady = true;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -90,48 +86,49 @@ public class StreamActivity extends AppCompatActivity {
         }
     }
 
-    void initializePlayer() {
-        player = ExoPlayerFactory.newSimpleInstance(
-                this,
-                new DefaultRenderersFactory(this),
-                new DefaultTrackSelector(new AdaptiveTrackSelection.Factory()),
-                new DefaultLoadControl(),
-                null,
-                BANDWIDTH_METER);
-        playerView.setPlayer(player);
-        MediaSource mediaSource = buildMediaSource(Uri.parse("http://10.0.2.2:3000/mux.mpd"));
+    private void initializePlayer() {
+        if (player == null) {
+            player = ExoPlayerFactory.newSimpleInstance(this, new DefaultRenderersFactory(this),
+                    new DefaultTrackSelector(), new DefaultLoadControl());
+            playerView.setPlayer(player);
+            player.setPlayWhenReady(playWhenReady);
+            player.seekTo(currentWindow, playbackPosition);
+        }
+//        MediaSource mediaSource = buildMediaSource(Uri.parse("http://10.0.2.2:3000/media/video.mp4"));
+        MediaSource mediaSource = buildDashMediaSource(Uri.parse("http://10.0.2.2:3000/media/mux.mpd"));
         player.prepare(mediaSource, true, false);
-        player.addListener(new Player.EventListener() {
-            @Override
-            public void onLoadingChanged(boolean isLoading) {
-                progressBar.setVisibility(isLoading ? View.VISIBLE : View.GONE);
-            }
-
-            @Override
-            public void onPlayerStateChanged(boolean playWhenReady, int playbackState) {
-                Log.d(TAG, "PayWhenReady: " + playWhenReady + ", PlayBack: " + playbackState);
-            }
-        });
-        player.setPlayWhenReady(true);
     }
 
     private void releasePlayer() {
         if (player != null) {
-//            playbackPosition = player.getCurrentPosition();
-//            currentWindow = player.getCurrentWindowIndex();
-//            playWhenReady = player.getPlayWhenReady();
+            playbackPosition = player.getCurrentPosition();
+            currentWindow = player.getCurrentWindowIndex();
+            playWhenReady = player.getPlayWhenReady();
             player.release();
             player = null;
         }
     }
 
     private MediaSource buildMediaSource(Uri uri) {
-        DataSource.Factory manifestDataSourceFactory =
-                new DefaultHttpDataSourceFactory("ua");
-        DashChunkSource.Factory dashChunkSourceFactory =
-                new DefaultDashChunkSource.Factory(
-                        new DefaultHttpDataSourceFactory("ua", BANDWIDTH_METER));
-        return new DashMediaSource.Factory(dashChunkSourceFactory,
-                manifestDataSourceFactory).createMediaSource(uri);
+        return new ExtractorMediaSource.Factory(new DefaultHttpDataSourceFactory("exoplayer-codelab"))
+                .createMediaSource(uri);
+    }
+
+    private MediaSource buildDashMediaSource(Uri uri) {
+        DashChunkSource.Factory dashChunkSourceFactory = new DefaultDashChunkSource.Factory(
+                new DefaultHttpDataSourceFactory("ua", BANDWIDTH_METER));
+        DataSource.Factory manifestDataSourceFactory = new DefaultHttpDataSourceFactory("ua");
+        return new DashMediaSource.Factory(dashChunkSourceFactory, manifestDataSourceFactory).
+                createMediaSource(uri);
+    }
+
+    @SuppressLint("InlinedApi")
+    private void hideSystemUi() {
+        playerView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LOW_PROFILE
+                | View.SYSTEM_UI_FLAG_FULLSCREEN
+                | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION);
     }
 }
