@@ -4,38 +4,41 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
 import android.support.design.widget.FloatingActionButton;
-import android.support.v4.os.EnvironmentCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
 import android.widget.ProgressBar;
 import android.widget.Toast;
 
+import com.google.android.exoplayer2.DefaultLoadControl;
+import com.google.android.exoplayer2.DefaultRenderersFactory;
 import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.ExoPlayerFactory;
 import com.google.android.exoplayer2.Player;
+import com.google.android.exoplayer2.SimpleExoPlayer;
 import com.google.android.exoplayer2.source.ExtractorMediaSource;
 import com.google.android.exoplayer2.source.MediaSource;
+import com.google.android.exoplayer2.trackselection.DefaultTrackSelector;
 import com.google.android.exoplayer2.ui.PlayerView;
 import com.google.android.exoplayer2.upstream.DataSource;
 import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory;
+import com.google.android.exoplayer2.upstream.DefaultHttpDataSourceFactory;
 import com.google.android.exoplayer2.util.Util;
 
 import java.io.File;
 import java.util.HashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 public class EditActivity extends AppCompatActivity {
 
     private final String TAG = EditActivity.class.getSimpleName();
 
-    private ExoPlayer player;
+    private SimpleExoPlayer player;
     private PlayerView playerView;
     private ProgressBar progressBar;
-    private static ExecutorService executorService;
-
     private String uri = null;
+    private long playbackPosition;
+    private int currentWindow;
+    private boolean playWhenReady = true;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -57,36 +60,74 @@ public class EditActivity extends AppCompatActivity {
     }
 
     @Override
-    protected void onStart() {
+    public void onStart() {
         super.onStart();
-        Log.d(TAG, "onStart");
-        if (player == null) {
-            player = ExoPlayerFactory.newSimpleInstance(this);
-            playerView.setPlayer(player);
-        }
-        if (executorService == null) {
-            executorService = Executors.newSingleThreadExecutor();
+        if (Util.SDK_INT > 23) {
+            initializePlayer();
         }
     }
 
     @Override
-    protected void onStop() {
+    public void onResume() {
+        super.onResume();
+        if ((Util.SDK_INT <= 23 || player == null)) {
+            initializePlayer();
+        } else {
+            player.seekTo(currentWindow, playbackPosition);
+        }
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        if (Util.SDK_INT <= 23) {
+            releasePlayer();
+        } else {
+            currentWindow = player.getCurrentWindowIndex();
+            playbackPosition = player.getCurrentPosition();
+        }
+    }
+
+    @Override
+    public void onStop() {
         super.onStop();
+        if (Util.SDK_INT > 23) {
+            releasePlayer();
+        }
+    }
+
+    private void initializePlayer() {
+        if (player == null) {
+            player = ExoPlayerFactory.newSimpleInstance(this, new DefaultRenderersFactory(this),
+                    new DefaultTrackSelector(), new DefaultLoadControl());
+            playerView.setPlayer(player);
+            player.setPlayWhenReady(playWhenReady);
+            player.seekTo(currentWindow, playbackPosition);
+        }
+//        MediaSource source = buildMediaSource(Uri.parse("/storage/emulated/0/mux.mp4"));
+//        player.prepare(source);
+    }
+
+    private void releasePlayer() {
         if (player != null) {
+            playbackPosition = player.getCurrentPosition();
+            currentWindow = player.getCurrentWindowIndex();
+            playWhenReady = player.getPlayWhenReady();
             player.release();
             player = null;
         }
     }
 
+    private MediaSource buildMediaSource(Uri uri) {
+        return new ExtractorMediaSource.Factory(new DefaultDataSourceFactory(this, "video-util"))
+                .createMediaSource(uri);
+    }
+
     private void playVideo(String uri) {
         Log.d(TAG, "playing: "+uri);
-        player.stop(true);
-        DataSource.Factory sourceFactory = new DefaultDataSourceFactory(this, Util.getUserAgent(this, "InterView"));
-        MediaSource source = new ExtractorMediaSource.Factory(sourceFactory)
-                .createMediaSource(Uri.parse(uri));
+        MediaSource source = buildMediaSource(Uri.parse(uri));
         player.setRepeatMode(Player.REPEAT_MODE_ONE);
         player.prepare(source);
-        player.setPlayWhenReady(true);
     }
 
     private void testConcat() {
@@ -99,7 +140,7 @@ public class EditActivity extends AppCompatActivity {
         HashMap<String, File> map = new HashMap<>();
         map.put("Question: how old are you", video0);
         map.put("Question: what is your skill", video1);
-        editor.concatVideos(uri, map, 40, 2, false, mListener);
+        editor.concatVideos(uri, map, 40, 2, true, mListener);
     }
 
     private void testBGM() {
@@ -130,7 +171,6 @@ public class EditActivity extends AppCompatActivity {
 
         @Override
         void onProgress(int progress) {
-            Log.d(TAG, "progress: " + progress);
             progressBar.setProgress(progress);
         }
 

@@ -53,13 +53,12 @@ public class VideoEditor {
             String[] filenames = new String[videos.size()];
 
             int i = 0;
-            while (videos.keySet().iterator().hasNext()) {
-                titles[i] = videos.keySet().iterator().next();
+            for (String s : videos.keySet()) {
+                titles[i] = s;
                 i++;
             }
             i = 0;
-            while (videos.values().iterator().hasNext()) {
-                File file = videos.values().iterator().next();
+            for (File file : videos.values()) {
                 if (!file.exists()) {
                     handler.obtainMessage(0, "file not exists: " + file.getAbsolutePath()).sendToTarget();
                     return;

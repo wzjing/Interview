@@ -26,7 +26,7 @@ struct Video {
 static int titleDuration = 2;
 static int fontSize = 40;
 
-int filter_frame(AVFrame *frame, const char *title, JNIEnv *env) {
+int filter_frame(AVFrame *frame, const char *title, JNIEnv *env, int rotation) {
     VideoFilter filter;
     int ret = 0;
     char filter_description[128];
@@ -50,7 +50,7 @@ int filter_frame(AVFrame *frame, const char *title, JNIEnv *env) {
     filter.destroy();
 
     drawText(env, frame->data[0], frame->width, frame->height, title,
-             fontSize, 0);
+             fontSize, rotation);
 
     filter.create("format=pix_fmts=yuv420p", &rgbaConfig, &outConfig);
     filter.filter(frame, frame);
@@ -63,12 +63,12 @@ int filter_frame(AVFrame *frame, const char *title, JNIEnv *env) {
     return ret;
 }
 
-int encode_title(const char *title, AVFormatContext *formatContext,
+int encode_title(AVFormatContext *formatContext,
                  AVFrame *srcAudioFrame, AVFrame *srcVideoFrame,
                  AVCodecContext *audioCodecContext, AVCodecContext *videoCodecContext,
                  AVStream *audioStream, AVStream *videoStream,
                  int64_t &audio_start_pts, int64_t &audio_start_dts,
-                 int64_t &video_start_pts, int64_t &video_start_dts, JNIEnv *env) {
+                 int64_t &video_start_pts, int64_t &video_start_dts) {
 
     int encode_video = 1;
     int encode_audio = 1;
@@ -98,12 +98,6 @@ int encode_title(const char *title, AVFormatContext *formatContext,
 
     int first_video_set = 0;
     int first_audio_set = 0;
-
-    ret = filter_frame(srcVideoFrame, title, env);
-    if (ret < 0) {
-        LOGE(TAG, "unable to filter video frame: %s\n", av_err2str(ret));
-        return -1;
-    }
 
     sample_size = av_get_bytes_per_sample((AVSampleFormat) srcAudioFrame->format);
     for (int i = 0; i < srcAudioFrame->channels; i++) {
@@ -399,6 +393,13 @@ int concat_no_encode(JNIEnv *env, const char *output_filename, const char **inpu
         return -1;
     }
 
+    AVDictionaryEntry *meta_rotation = av_dict_get(baseVideo->videoStream->metadata, "rotate",
+                                                   nullptr, 0);
+    int videoRotation = 0;
+    if (meta_rotation) {
+        videoRotation = strtol(meta_rotation->value, nullptr, 10);
+    }
+
     if (!(outFmtContext->oformat->flags & AVFMT_NOFILE)) {
         LOGD(TAG, "Opening file: %s\n", output_filename);
         ret = avio_open(&outFmtContext->pb, output_filename, AVIO_FLAG_WRITE);
@@ -512,11 +513,16 @@ int concat_no_encode(JNIEnv *env, const char *output_filename, const char **inpu
             audioFrame->sample_rate = outAudioContext->sample_rate;
         }
 
-        ret = encode_title(titles[i], outFmtContext, audioFrame, videoFrame, outAudioContext,
+        ret = filter_frame(videoFrame, titles[i], env, videoRotation);
+        if (ret < 0) {
+            LOGE(TAG, "unable to filter video frame: %s\n", av_err2str(ret));
+            return -1;
+        }
+        ret = encode_title(outFmtContext, audioFrame, videoFrame, outAudioContext,
                            outVideoContext,
                            outAudioStream, outVideoStream, last_audio_pts, last_audio_dts,
                            last_video_pts,
-                           last_video_dts, env);
+                           last_video_dts);
 
         if (ret < 0) {
             LOGE(TAG, "encode title failed for file: %s\n", input_filenames[i]);
@@ -829,11 +835,11 @@ int concat_encode(JNIEnv *env, const char *output_filename, const char **input_f
     av_dict_copy(&outVideoStream->metadata, baseVideo->videoStream->metadata, 0);
     AVDictionaryEntry *meta_rotation = av_dict_get(baseVideo->videoStream->metadata, "rotate",
                                                    nullptr, 0);
-    int rotate = 0;
+    int videoRotation = 0;
     if (meta_rotation) {
-        rotate = strtol(meta_rotation->value, nullptr, 10);
+        videoRotation = strtol(meta_rotation->value, nullptr, 10);
     }
-    LOGD(TAG, "video rotation: %d\n", rotate);
+    LOGD(TAG, "video rotation: %d\n", videoRotation);
     ret = avcodec_parameters_from_context(outAudioStream->codecpar, outAudioContext);
     if (ret < 0) {
         LOGE(TAG, "unable to copy parameter to output audio stream: %s\n", av_err2str(ret));
@@ -926,7 +932,7 @@ int concat_encode(JNIEnv *env, const char *output_filename, const char **input_f
         outAudioFrame->format = outAudioContext->sample_fmt;
         av_frame_get_buffer(outAudioFrame, 0);
 
-        filter_frame(inVideoFrame, titles[i], env);
+        filter_frame(inVideoFrame, titles[i], env, videoRotation);
 
         int sample_size = av_get_bytes_per_sample((AVSampleFormat) inAudioFrame->format);
         for (int j = 0; j < inAudioFrame->channels; j++) {

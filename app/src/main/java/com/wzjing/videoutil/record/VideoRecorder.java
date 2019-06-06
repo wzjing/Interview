@@ -1,6 +1,5 @@
 package com.wzjing.videoutil.record;
 
-import android.media.MediaCodecInfo;
 import android.media.MediaRecorder;
 import android.os.Build;
 import android.support.annotation.NonNull;
@@ -156,19 +155,19 @@ public class VideoRecorder {
         });
         mediaRecorder.setCamera(cameraManager.getCamera());
         mediaRecorder.setOrientationHint(90);
-        mediaRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
+        mediaRecorder.setAudioSource(MediaRecorder.AudioSource.VOICE_RECOGNITION);
         mediaRecorder.setVideoSource(MediaRecorder.VideoSource.CAMERA);
         mediaRecorder.setPreviewDisplay(surfaceView.getHolder().getSurface());
         mediaRecorder.setOutputFile(file.getAbsolutePath());
         // video configuration
         mediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
-        mediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
+        mediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC_ELD);
         mediaRecorder.setAudioChannels(2);
         mediaRecorder.setAudioSamplingRate(44100);
-        mediaRecorder.setAudioEncodingBitRate(96000);
+        mediaRecorder.setAudioEncodingBitRate(192000);
         mediaRecorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264);
         mediaRecorder.setVideoFrameRate(30);
-        mediaRecorder.setVideoEncodingBitRate(4000000);
+        mediaRecorder.setVideoEncodingBitRate(7000000);
         mediaRecorder.setVideoSize(width, height);
     }
 

@@ -32,7 +32,7 @@ public class CameraManager implements SurfaceHolder.Callback {
      *
      * @param holder 用于显示相机预览
      * @param width  预览宽度，指相机的原始宽度，即横屏下的宽度
-     * @param height 预览高度，只相机的原始高度，即横屏下的高度
+     * @param height 预览高度，指相机的原始高度，即横屏下的高度
      */
     public CameraManager(@NonNull SurfaceHolder holder, int width, int height) {
         this.width = width;
